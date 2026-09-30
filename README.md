@@ -1,7 +1,8 @@
 # Melange
 
 A collection of mods for **Schedule I** (IL2CPP, MelonLoader 0.7) by r-melvin. Each mod is its own
-project and its own DLL: install only the ones you want.
+project and its own DLL, and none needs another: install only the ones you want. Helper code two mods
+share is compiled into each of them, never shipped as a separate library.
 
 | Mod | What it does | Status |
 |---|---|---|

@@ -202,7 +202,8 @@ namespace PaperTrail
                 SaveKind.BeforeRestore => $"Before restore - {s.Location}",
                 _ => s.Location,
             };
-            return $"{head} - Day {s.GameDay}, {Clock(s.GameTime)} - {PlayTime(s.PlaySeconds)}";
+            string when = s.GameDay > 0 ? $" - Day {s.GameDay}, {Clock(s.GameTime)}" : "";
+            return $"{head}{when} - {PlayTime(s.PlaySeconds)}";
         }
 
         public static string Clock(int hhmm)
@@ -215,6 +216,27 @@ namespace PaperTrail
         {
             var t = TimeSpan.FromSeconds(seconds);
             return $"{(int)t.TotalHours}h {t.Minutes:00}m";
+        }
+
+        /// <summary>When the game last wrote to the slot, or null if it is empty.</summary>
+        public static DateTime? SlotWrittenUtc(int slot)
+        {
+            var dir = GameSlotFolder(slot);
+            if (!Directory.Exists(dir)) return null;
+            var files = Directory.GetFiles(dir, "*", SearchOption.AllDirectories);
+            return files.Length == 0 ? null : files.Max(f => File.GetLastWriteTimeUtc(f));
+        }
+
+        /// <summary>
+        /// Has the slot been saved since its newest snapshot? True for saves made without Paper Trail, and for a
+        /// slot with no snapshots at all - the only cases where a restore would lose something.
+        /// </summary>
+        public static bool SlotNewerThanSnapshots(int slot)
+        {
+            var written = SlotWrittenUtc(slot);
+            if (written == null) return false;
+            var newest = List(slot).FirstOrDefault();
+            return newest == null || written.Value > newest.CreatedUtc.AddSeconds(5);
         }
 
         // ---------------------------------------------------------------- files

@@ -22,6 +22,10 @@ namespace PaperTrail
     public sealed class Mod : MelonMod
     {
         public static MelonLogger.Instance Log { get; private set; }
+        public static Mod Instance { get; private set; }
+
+        /// <summary>Raised on the main thread once a save's snapshot is on disk.</summary>
+        public static event Action<SnapshotInfo> SnapshotTaken;
 
         /// <summary>In-game minutes between auto-saves: 2 hours.</summary>
         private const int AutoSaveEveryMinutes = 120;
@@ -29,6 +33,12 @@ namespace PaperTrail
         // What the save now starting is: set just before a save by whoever asked for it.
         private static SaveKind? _pendingKind;
         private static SaveKind _currentKind = SaveKind.Manual;
+        private static string _pendingNote, _currentNote;
+        private static SnapshotInfo _pendingReplace, _currentReplace;
+
+        // A load chosen in-game: carried out once the game is back at the main menu.
+        private static int _pendingLoadSlot;
+        private static SnapshotInfo _pendingLoadSnapshot;
 
         private bool _hooked;
         private int _slot;                       // 1-5 while a game is loaded, 0 otherwise
@@ -41,12 +51,99 @@ namespace PaperTrail
         public override void OnInitializeMelon()
         {
             Log = LoggerInstance;
+            Instance = this;
             try
             {
                 HarmonyInstance.Patch(AccessTools.Method(typeof(SleepController), "RpcLogic___StartSleep_2166136261"),
                     prefix: new HarmonyMethod(typeof(Mod), nameof(BeforeSleepSave)));
             }
             catch (Exception e) { Log.Warning("sleep saves will show as manual saves: " + e.Message); }
+            try
+            {
+                HarmonyInstance.Patch(AccessTools.Method(typeof(SavePoint), nameof(SavePoint.Interacted)),
+                    prefix: new HarmonyMethod(typeof(Mod), nameof(SavePointInteracted)));
+            }
+            catch (Exception e) { Log.Warning("the safehouse save button keeps saving straight away: " + e.Message); }
+        }
+
+        /// <summary>The safehouse "Save game" button opens the save screen instead of saving on the spot.</summary>
+        private static bool SavePointInteracted()
+        {
+            if (!InstanceFinder.IsServer || Singleton<SaveManager>.Instance.IsSaving || Instance._slot <= 0) return true;
+            SaveScreen.Open(SaveScreen.Mode.Save);
+            return false;
+        }
+
+        /// <summary>The save slot of the game being played, or 0 at the menu.</summary>
+        public int CurrentSlot => Math.Max(_slot, 0);
+
+        /// <summary>
+        /// A manual save from the save screen: optionally named, optionally replacing an existing save (which
+        /// keeps its pin).
+        /// </summary>
+        public bool RequestManualSave(string note, SnapshotInfo replace)
+        {
+            string blocked = WhyNotNow(manual: true);
+            if (blocked != null) { Log.Msg("can't save now: " + blocked); return false; }
+            _pendingKind = SaveKind.Manual;
+            _pendingNote = note;
+            _pendingReplace = replace;
+            Singleton<SaveManager>.Instance.Save();
+            return true;
+        }
+
+        /// <summary>
+        /// Starts a save from the menu: the slot as last saved (snapshot null) or a snapshot of it. Restoring a
+        /// snapshot keeps the slot's current state first when it is newer than every snapshot.
+        /// </summary>
+        public static void LoadNow(int slot, SnapshotInfo snapshot)
+        {
+            try
+            {
+                var lm = Singleton<LoadManager>.Instance;
+                if (snapshot != null)
+                {
+                    SnapshotInfo keep = null;
+                    if (Store.SlotNewerThanSnapshots(slot))
+                        keep = new SnapshotInfo
+                        {
+                            Location = "Last save",
+                            PlaySeconds = Store.Campaign(slot).PlaySeconds,
+                            Organisation = snapshot.Organisation,
+                            GameVersion = Application.version,
+                        };
+                    Store.Restore(slot, snapshot, keep);
+                    var campaign = Store.Campaign(slot);
+                    campaign.PlaySeconds = snapshot.PlaySeconds;      // play time goes back with the save
+                    Store.SaveCampaign(slot, campaign);
+                    Log.Msg($"restored slot {slot} to: {Store.Describe(snapshot)}");
+                }
+                lm.RefreshSaveInfo();
+                var info = LoadManager.SaveGames[slot - 1];
+                if (info == null) { Log.Error($"slot {slot} has no save to load"); return; }
+                lm.StartGame(info, false, true);
+            }
+            catch (Exception e) { Log.Error("load failed: " + e); }
+        }
+
+        /// <summary>From inside a game: back to the menu, then load there.</summary>
+        public static void LoadFromGame(int slot, SnapshotInfo snapshot)
+        {
+            _pendingLoadSlot = slot;
+            _pendingLoadSnapshot = snapshot;
+            Singleton<LoadManager>.Instance.ExitToMenu(null, null, false);
+        }
+
+        private IEnumerator LoadWhenMenuReady()
+        {
+            float until = Time.realtimeSinceStartup + 2f;
+            while (Time.realtimeSinceStartup < until || !Singleton<LoadManager>.InstanceExists
+                   || Singleton<LoadManager>.Instance.IsLoading) yield return null;
+            int slot = _pendingLoadSlot;
+            var snapshot = _pendingLoadSnapshot;
+            _pendingLoadSlot = 0;
+            _pendingLoadSnapshot = null;
+            LoadNow(slot, snapshot);
         }
 
         private static void BeforeSleepSave() => _pendingKind = SaveKind.Sleep;
@@ -54,7 +151,14 @@ namespace PaperTrail
         public override void OnSceneWasInitialized(int buildIndex, string sceneName)
         {
             HookSaveManager();
-            if (sceneName == "Menu") LeaveGame();
+            SaveScreen.CloseIfOpen();
+            if (sceneName == "Menu")
+            {
+                LeaveGame();
+                if (_pendingLoadSlot > 0) MelonCoroutines.Start(LoadWhenMenuReady());
+            }
+            MelonCoroutines.Start(Hooks.AttachWhenReady(sceneName));
+            if (DevInspect.On) MelonCoroutines.Start(DevInspect.Run(sceneName));
         }
 
         private void HookSaveManager()
@@ -107,6 +211,7 @@ namespace PaperTrail
 
         public override void OnUpdate()
         {
+            SaveScreen.Tick();
             if (!InGame(out var lm)) { if (_slot != 0 && (lm == null || !lm.IsGameLoaded)) LeaveGame(); return; }
             if (_slot == 0) EnterGame(lm);
             if (_slot < 0) return;
@@ -144,7 +249,7 @@ namespace PaperTrail
 
         private void TryAutoSave()
         {
-            string blocked = WhyNotNow();
+            string blocked = WhyNotNow(manual: false);
             if (blocked != null)
             {
                 if (Time.realtimeSinceStartup - _lastBlockedLog > 60f)
@@ -161,7 +266,7 @@ namespace PaperTrail
         }
 
         /// <summary>Why this is not a safe moment to save, or null when it is.</summary>
-        private static string WhyNotNow()
+        private static string WhyNotNow(bool manual)
         {
             if (!InstanceFinder.IsServer) return "only the host saves";
             if (NetworkSingleton<GameManager>.InstanceExists && NetworkSingleton<GameManager>.Instance.IsTutorial) return "tutorial";
@@ -173,6 +278,7 @@ namespace PaperTrail
             if (player.IsUnconscious) return "knocked out";
             if (player.IsInVehicle) return "in a vehicle";
             if (player.CrimeData != null && player.CrimeData.CurrentPursuitLevel != PlayerCrimeData.EPursuitLevel.None) return "police pursuit";
+            if (manual) return null;   // saving from the save screen: the pause menu or the screen itself is open
             if (Singleton<PauseMenu>.InstanceExists && Singleton<PauseMenu>.Instance.IsPaused) return "paused";
             if (PlayerSingleton<PlayerCamera>.InstanceExists && PlayerSingleton<PlayerCamera>.Instance.ActiveUIElementCount > 0) return "a menu or dialogue is open";
             return null;
@@ -183,7 +289,11 @@ namespace PaperTrail
         private static void OnSaveStart()
         {
             _currentKind = _pendingKind ?? SaveKind.Manual;
+            _currentNote = _pendingNote;
+            _currentReplace = _pendingReplace;
             _pendingKind = null;
+            _pendingNote = null;
+            _pendingReplace = null;
         }
 
         private void OnSaveComplete()
@@ -192,7 +302,10 @@ namespace PaperTrail
             _minutesSinceSave = 0;
             var info = Describe(_currentKind);
             info.SaveHadErrors = SaveManager.SaveError;
-            MelonCoroutines.Start(SnapshotSoon(info));
+            info.Note = _currentNote ?? "";
+            if (_currentReplace != null) info.Pinned = _currentReplace.Pinned;
+            MelonCoroutines.Start(SnapshotSoon(info, _currentReplace));
+            _currentReplace = null;
         }
 
         private SnapshotInfo Describe(SaveKind kind)
@@ -238,7 +351,7 @@ namespace PaperTrail
         /// The copy is taken a moment after the game's save completes: other mods write their own files into
         /// the slot around the same time, and the snapshot should include them.
         /// </summary>
-        private IEnumerator SnapshotSoon(SnapshotInfo info)
+        private IEnumerator SnapshotSoon(SnapshotInfo info, SnapshotInfo replace)
         {
             int slot = _slot;
             float until = Time.realtimeSinceStartup + 1.5f;
@@ -247,12 +360,15 @@ namespace PaperTrail
             {
                 if (info.Kind == SaveKind.Auto) info.AutoNumber = _campaign.NextAutoNumber++;
                 Store.Take(slot, info);
+                if (replace != null)
+                    try { Store.Delete(replace); } catch (Exception e) { Log.Warning("could not remove the save it overwrote: " + e.Message); }
                 Store.SaveCampaign(slot, _campaign);
                 int pruned = Store.Prune(slot);
                 Log.Msg($"snapshot: {Store.Describe(info)}{(info.SaveHadErrors ? " (the game reported errors while saving)" : "")}"
                       + (pruned > 0 ? $" - removed {pruned} old auto-save(s)" : ""));
             }
             catch (Exception e) { Log.Error("snapshot failed: " + e); }
+            try { SnapshotTaken?.Invoke(info); } catch (Exception e) { Log.Warning("save screen refresh: " + e.Message); }
         }
 
         // ---------------------------------------------------------------- text
