@@ -415,7 +415,7 @@ namespace PaperTrail
                     ? "No saves recorded for this campaign yet. Load starts it as last saved; from then on every save is kept here."
                     : "Nothing saved in this slot.");
             else if (!_saving)
-                Note(_mode == Mode.Save ? "Auto-saves are kept 10 at a time. Manual, sleep and pinned saves are never removed." : "");
+                Note(_mode == Mode.Save ? $"The newest {Settings.AutoSavesKept} auto-saves are kept. Manual, sleep and pinned saves are never removed." : "");
             if (_selected >= Entries.Count || _selected < 0) _selected = Entries.Count > 0 ? 0 : -1;
             Select(_selected);
             // Only as tall as the saves need, like the game's own screens, up to a scrolling maximum.

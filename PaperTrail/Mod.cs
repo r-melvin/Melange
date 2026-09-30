@@ -27,9 +27,6 @@ namespace PaperTrail
         /// <summary>Raised on the main thread once a save's snapshot is on disk.</summary>
         public static event Action<SnapshotInfo> SnapshotTaken;
 
-        /// <summary>In-game minutes between auto-saves: 2 hours.</summary>
-        private const int AutoSaveEveryMinutes = 120;
-
         // What the save now starting is: set just before a save by whoever asked for it.
         private static SaveKind? _pendingKind;
         private static SaveKind _currentKind = SaveKind.Manual;
@@ -40,6 +37,7 @@ namespace PaperTrail
         private static int _pendingLoadSlot;
         private static SnapshotInfo _pendingLoadSnapshot;
 
+        private static bool _startupHandled;
         private bool _hooked;
         private int _slot;                       // 1-5 while a game is loaded, 0 otherwise
         private CampaignInfo _campaign;
@@ -52,6 +50,7 @@ namespace PaperTrail
         {
             Log = LoggerInstance;
             Instance = this;
+            Settings.Register();
             try
             {
                 HarmonyInstance.Patch(AccessTools.Method(typeof(SleepController), "RpcLogic___StartSleep_2166136261"),
@@ -134,6 +133,26 @@ namespace PaperTrail
             Singleton<LoadManager>.Instance.ExitToMenu(null, null, false);
         }
 
+        /// <summary>Loads the most recently played save once the menu is up. Holding Shift skips it.</summary>
+        private IEnumerator ContinueLastGame()
+        {
+            float deadline = Time.realtimeSinceStartup + 40f;
+            // The menu needs a moment: its save list is read, and Paper Trail's screen pieces are captured.
+            float settle = Time.realtimeSinceStartup + 2.5f;
+            while (Time.realtimeSinceStartup < settle) { if (SkipKeyHeld()) break; yield return null; }
+            while (Time.realtimeSinceStartup < deadline
+                   && (!Singleton<LoadManager>.InstanceExists || Singleton<LoadManager>.Instance.IsLoading
+                       || LoadManager.LastPlayedGame == null))
+                yield return null;
+            if (SkipKeyHeld()) { Log.Msg("start-up continue skipped (Shift held)"); yield break; }
+            var last = LoadManager.LastPlayedGame;
+            if (last == null) { Log.Msg("start-up continue: no saved game to continue"); yield break; }
+            Log.Msg($"start-up continue: loading {last.OrganisationName} (slot {last.SaveSlotNumber}) - hold Shift at start-up to skip");
+            LoadNow(last.SaveSlotNumber, null);
+        }
+
+        private static bool SkipKeyHeld() => Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+
         private IEnumerator LoadWhenMenuReady()
         {
             float until = Time.realtimeSinceStartup + 2f;
@@ -156,6 +175,11 @@ namespace PaperTrail
             {
                 LeaveGame();
                 if (_pendingLoadSlot > 0) MelonCoroutines.Start(LoadWhenMenuReady());
+                else if (!_startupHandled)
+                {
+                    _startupHandled = true;           // only the first menu of a session: going back to it stays there
+                    if (Settings.ContinueOnStartup) MelonCoroutines.Start(ContinueLastGame());
+                }
             }
             MelonCoroutines.Start(Hooks.AttachWhenReady(sceneName));
             if (DevInspect.On) MelonCoroutines.Start(DevInspect.Run(sceneName));
@@ -227,7 +251,7 @@ namespace PaperTrail
             }
 
             CountGameMinutes();
-            if (_minutesSinceSave >= AutoSaveEveryMinutes) TryAutoSave();
+            if (Settings.AutoSaveEnabled && _minutesSinceSave >= Settings.AutoSaveEveryMinutes) TryAutoSave();
         }
 
         /// <summary>In-game minutes since the last save of any kind, from the clock's hhmm.</summary>

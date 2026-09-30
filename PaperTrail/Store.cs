@@ -50,7 +50,6 @@ namespace PaperTrail
     /// </remarks>
     public static class Store
     {
-        public const int AutoSavesKept = 10;
         private const string InfoFile = "snapshot.json";
         private const string CampaignFile = "campaign.json";
 
@@ -152,11 +151,11 @@ namespace PaperTrail
             if (Directory.Exists(info.Folder)) Directory.Delete(info.Folder, true);
         }
 
-        /// <summary>Keeps the newest <see cref="AutoSavesKept"/> unpinned auto-saves of a slot and deletes the rest.</summary>
+        /// <summary>Keeps the newest <see cref="Settings.AutoSavesKept"/> unpinned auto-saves of a slot and deletes the rest.</summary>
         public static int Prune(int slot)
         {
             int removed = 0;
-            foreach (var old in List(slot).Where(s => s.Kind == SaveKind.Auto && !s.Pinned).Skip(AutoSavesKept))
+            foreach (var old in List(slot).Where(s => s.Kind == SaveKind.Auto && !s.Pinned).Skip(Settings.AutoSavesKept))
             {
                 try { Delete(old); removed++; }
                 catch (Exception e) { Mod.Log.Warning($"could not remove old auto-save {Path.GetFileName(old.Folder)}: {e.Message}"); }
