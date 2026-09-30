@@ -6,10 +6,44 @@ share is compiled into each of them, never shipped as a separate library.
 
 | Mod | What it does | Status |
 |---|---|---|
-| [Paper Trail](PaperTrail/) | Rolling auto-saves every 2 in-game hours at a safe moment, a snapshot of every save, and a save/load screen from the main menu and pause menu. | In development |
+| [Paper Trail](PaperTrail/) | Rolling auto-saves every 2 in-game hours at a safe moment, a snapshot of every save, and a save/load screen from the main menu and pause menu. | 0.1.0 |
 
 Looking for the fixes for other people's mods? Those are
 [Schedule I Unofficial Mod Fixes (S1UMF)](https://github.com/r-melvin/S1UMF).
+
+## Paper Trail
+
+A rolling auto-save and a save manager that looks and feels like part of the game.
+
+- **Auto-save** every 2 in-game hours (keeps the last 10), only at a safe moment: not mid-deal, mid-fight or while
+  the game is saving.
+- **Key-moment saves** when a quest is completed, a dealer is recruited, a property or business is bought, you
+  rank up, the cartel situation changes, or a new area or supplier is unlocked. (Customer unlocked is off by default.)
+- **Save screen** from main-menu *Continue*, the pause menu's *Save* button and the safehouse *Intercom Save
+  Point*. Load, Save, Overwrite, Rename, Pin and Delete, built from the game's own panels and buttons.
+  Holding **Shift** while the game starts skips "continue last game on start-up".
+- **Follows the game's 60-second save wait** after a save-point save or a load.
+- **Safeguards:** a copy is kept before a save is loaded into a newer game version or with a changed mod list.
+  Each snapshot is checked for looking incomplete (far fewer or smaller files than the one before it) and is then
+  marked and not allowed to push older saves out.
+- **Steam Cloud:** snapshots are worked on locally and mirrored to a Steam Cloud folder, so they follow you between
+  computers. Turn it off with *Sync snapshots with Steam Cloud*.
+- **Light on the game:** copying, zipping and syncing run on a low-priority background thread.
+
+Settings are in `UserData/MelonPreferences.cfg` and in the Mod Manager phone app under **PaperTrail**:
+continue last game on start-up, auto-save on/off, interval and count, each key-moment toggle and count,
+manual-save limit (default 30), safeguard copies kept, and cloud sync.
+
+### Your snapshots without the mod
+
+Every snapshot is a standard zip in the game's own export layout (`SaveGame_N/...`), so removing Paper Trail
+loses nothing. Snapshots are in `UserData/PaperTrail/Snapshots/Slot_N/<snapshot>/save.zip` (and mirrored in
+`Saves/<SteamID>/PaperTrail/`). To use one, open the game's *Continue* screen and use **Import** on the zip, or
+unzip it over the save folder yourself.
+
+### Installing
+
+Needs MelonLoader 0.7.x. Put `PaperTrail.dll` in the game's `Mods` folder.
 
 ## Building
 
