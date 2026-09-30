@@ -12,7 +12,8 @@ namespace PaperTrail
     /// </summary>
     internal static class Templates
     {
-        public static GameObject Background, Title, Row, SmallButton, Hint;
+        public static GameObject Background, Title, Row, SmallButton, Hint, DialogBack, DialogConfirm, InputField;
+        public static Sprite FrameSprite, RoundedSprite;
         public static UnityEngine.UI.CanvasScaler.ScaleMode ScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
         public static Vector2 ReferenceResolution = new Vector2(1920, 1080);
         public static float Match = 0.5f;
@@ -60,12 +61,36 @@ namespace PaperTrail
                     if (info != null) info.gameObject.SetActive(true);
                     RemoveNavigation(Row);
                 }
+                FrameSprite = slot != null ? slot.Find("Container/Button/Selected Frame")?.GetComponent<UnityEngine.UI.Image>()?.sprite : null;
                 var export = slot != null ? slot.Find("Container/Info/Export") : null;
+                RoundedSprite = export != null ? export.GetComponent<UnityEngine.UI.Image>()?.sprite : null;
                 SmallButton = Keep(export);
                 if (SmallButton != null)
                 {
                     foreach (var c in SmallButton.GetComponents<SaveExportButton>()) Object.DestroyImmediate(c);
                     RemoveNavigation(SmallButton);
+                }
+                // The game's own question dialogs: its grey Back and coloured Confirm buttons (from the overwrite
+                // confirmation) and the name box from organisation setup.
+                var confirm = Object.FindObjectOfType<ConfirmOverwriteScreen>(true);
+                if (confirm != null)
+                {
+                    DialogBack = Keep(confirm.transform.Find("Background/Back"));
+                    DialogConfirm = Keep(confirm.transform.Find("Background/Confirm"));
+                    foreach (var b in new[] { DialogBack, DialogConfirm }) if (b != null) RemoveNavigation(b);
+                }
+                var setup = Object.FindObjectOfType<SetupScreen>(true);
+                if (setup != null)
+                {
+                    InputField = Keep(setup.transform.Find("InputField (TMP)"));
+                    if (InputField != null)
+                    {
+                        foreach (var c in InputField.GetComponents<Component>())
+                        {
+                            string n = c != null ? c.GetIl2CppType().Name : "";
+                            if (n == "InputFieldAttachment" || n == "UISelectable_OSK" || n == "UISelectable") Object.DestroyImmediate(c);
+                        }
+                    }
                 }
                 var title = Title != null ? Title.GetComponent<TextMeshProUGUI>() : null;
                 if (title != null) Ui.Font = title.font;

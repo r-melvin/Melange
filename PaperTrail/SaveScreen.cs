@@ -50,6 +50,12 @@ namespace PaperTrail
         private static TextMeshProUGUI _title, _campaign, _status;
         private static SmallBtn _load, _save, _overwrite, _rename, _pin, _delete, _prevCampaign, _nextCampaign;
         private static GameObject _modal;
+        private static RectTransform _listPage, _dialogPage;
+        private static float _listHeight = PanelHeight;
+        private static bool _focusPending;
+        private static int _focusFrame;
+        private static int _lastWait = -1;
+        private static GameObject _inputFrame;
         private static TMP_InputField _modalInput;
         private static Action<string> _modalOk;
         private static GameInput.ExitDelegate _exit;
@@ -58,12 +64,37 @@ namespace PaperTrail
         private static float _lastClick;
         private static int _lastClickIndex = -1;
 
-        public static bool IsOpen => _root != null;
+        // A flag of our own: the game destroys the screen's objects itself when a scene changes, and a destroyed
+        // object reads as null - which used to leave the rest of the state (buttons disabled while "saving", the
+        // Escape listener, the borrowed mouse) behind for the next time the screen was opened.
+        private static bool _open;
+
+        public static bool IsOpen => _open;
+
+        /// <summary>For the dev preview: presses a button by its label, as a click does.</summary>
+        public static bool DevPress(string label)
+        {
+            var b = new[] { _load, _save, _overwrite, _rename, _pin, _delete }.FirstOrDefault(x => x != null && x.Text.text == label);
+            bool ok = b != null && b.Button.interactable;
+            Mod.Log.Msg($"[preview] press '{label}': found={b != null} interactable={b?.Button.interactable} selected={_selected} "
+                      + $"rows={Entries.Count} saving={_saving} modal={_modal != null}");
+            if (!ok) return false;
+            b.Button.onClick.Invoke();
+            return true;
+        }
+
+        public static void DevSelect(int index) { if (_root != null && index < Entries.Count) Select(index); }
+
+        public static void DevType(string text) { if (_modalInput != null) _modalInput.text = text; }
+
+        public static void DevCancelDialog() => CloseModal();
+
+        public static void DevConfirm() { if (_modal != null) ConfirmModal(); }
 
         /// <summary>For the dev preview: what the screen looks like from the inside.</summary>
         public static string DebugState()
         {
-            if (_root == null) return "closed";
+            if (!_open || _root == null) return "closed";
             var canvas = _root.GetComponent<Canvas>();
             return $"active={_root.activeInHierarchy} canvas={(canvas != null && canvas.enabled)} order={canvas?.sortingOrder} "
                  + $"alpha={_group?.alpha} scale={_panel?.localScale.x} rows={Entries.Count} templates={Templates.Ready} "
@@ -81,6 +112,11 @@ namespace PaperTrail
         private static void OpenInner(Mode mode)
         {
             CloseIfOpen();
+            _saving = false;
+            _modal = null;
+            _modalInput = null;
+            Entries.Clear();
+            _selected = -1;
             _mode = mode;
             int playing = Mod.Instance.CurrentSlot;
             if (mode == Mode.Save && playing <= 0) return;
@@ -93,6 +129,7 @@ namespace PaperTrail
                 catch { _hiddenMenuScreen = null; }
 
             Build();
+            _open = true;
             Refresh();
 
             _exit = (GameInput.ExitDelegate)new Action<ExitAction>(OnExit);
@@ -103,12 +140,13 @@ namespace PaperTrail
 
         public static void CloseIfOpen()
         {
-            if (_root == null) return;
+            if (!_open) return;
+            _open = false;
             Mod.SnapshotTaken -= OnSnapshot;
             if (_exit != null) { try { GameInput.DeregisterExitListener(_exit); } catch { } _exit = null; }
             GameInput.IsTyping = false;
             ReleaseInput();
-            Object.Destroy(_root);
+            if (_root != null) Object.Destroy(_root);
             _root = null;
             _modal = null;
             _modalInput = null;
@@ -123,7 +161,7 @@ namespace PaperTrail
 
         private static void OnExit(ExitAction action)
         {
-            if (_root == null || action.Used) return;
+            if (!_open || action.Used) return;
             action.Used = true;
             if (_modal != null) CloseModal();
             else CloseIfOpen();
@@ -156,11 +194,25 @@ namespace PaperTrail
 
         public static void Tick()
         {
-            if (_root == null) return;
+            if (!_open) return;
+            if (_root == null) { CloseIfOpen(); return; }          // the game destroyed it with a scene change
             float t = Mathf.Clamp01((Time.unscaledTime - _openedAt) / LerpTime);
             if (_group != null) _group.alpha = t;
             if (_panel != null) _panel.localScale = Vector3.one * Mathf.Lerp(LerpScale, 1f, t);
-            GameInput.IsTyping = _modalInput != null && _modalInput.isFocused;
+            if (_focusPending && _modalInput != null && Time.frameCount >= _focusFrame)
+            {
+                _focusPending = false;
+                _modalInput.ActivateInputField();
+                _modalInput.MoveTextEnd(false);
+            }
+            if (_mode == Mode.Save && _modal == null && !_saving)
+            {
+                int wait = Mathf.CeilToInt(Mod.CooldownLeft());
+                if (wait != _lastWait) { _lastWait = wait; Select(_selected); }
+            }
+            bool typing = _modalInput != null && _modalInput.isFocused;
+            GameInput.IsTyping = typing;
+            if (_inputFrame != null) _inputFrame.SetActive(typing);
             if (_modal != null && _modalOk != null && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)))
                 ConfirmModal();
         }
@@ -231,14 +283,18 @@ namespace PaperTrail
 
             _title = TitleText(_panel, _mode == Mode.Save ? "Save Game" : "Load Game");
 
-            var camp = Ui.Place(Ui.Node("Campaign", _panel), 0, 1, 1, 1, 60, -92, 60, 54);
+            _listPage = Ui.Place(Ui.Node("ListPage", _panel), 0, 0, 1, 1);
+            _dialogPage = Ui.Place(Ui.Node("DialogPage", _panel), 0, 0, 1, 1);
+            _dialogPage.gameObject.SetActive(false);
+
+            var camp = Ui.Place(Ui.Node("Campaign", _listPage), 0, 1, 1, 1, 60, -92, 60, 54);
             _campaign = Ui.Label(camp, "", 14, Color.white, TextAlignmentOptions.Center);
-            _prevCampaign = SmallButton(Ui.Place(Ui.Node("Prev", _panel), 0, 1, 0, 1, 20, -86, -56, 60), "<", () => StepCampaign(-1));
-            _nextCampaign = SmallButton(Ui.Place(Ui.Node("Next", _panel), 1, 1, 1, 1, -56, -86, 20, 60), ">", () => StepCampaign(1));
+            _prevCampaign = SmallButton(Ui.Place(Ui.Node("Prev", _listPage), 0, 1, 0, 1, 20, -86, -56, 60), "<", () => StepCampaign(-1));
+            _nextCampaign = SmallButton(Ui.Place(Ui.Node("Next", _listPage), 1, 1, 1, 1, -56, -86, 20, 60), ">", () => StepCampaign(1));
 
-            _content = List(Ui.Place(Ui.Node("List", _panel), 0, 0, 1, 1, 20, 56, 20, 100));
+            _content = List(Ui.Place(Ui.Node("List", _listPage), 0, 0, 1, 1, 20, 56, 20, 100));
 
-            var bar = Ui.Place(Ui.Node("Buttons", _panel), 0, 0, 1, 0, 20, 18, 20, -44);
+            var bar = Ui.Place(Ui.Node("Buttons", _listPage), 0, 0, 1, 0, 20, 18, 20, -44);
             var row = bar.gameObject.AddComponent<HorizontalLayoutGroup>();
             row.spacing = 8;
             row.childAlignment = TextAnchor.MiddleCenter;
@@ -398,7 +454,7 @@ namespace PaperTrail
 
         private static void Refresh()
         {
-            if (_root == null) return;
+            if (!_open || _root == null) return;
             _campaign.text = CampaignName(_slot);
             bool browse = _mode == Mode.Load && Mod.Instance.CurrentSlot <= 0 && Campaigns().Count() > 1;
             _prevCampaign.Button.gameObject.SetActive(browse);
@@ -419,8 +475,13 @@ namespace PaperTrail
             if (_selected >= Entries.Count || _selected < 0) _selected = Entries.Count > 0 ? 0 : -1;
             Select(_selected);
             // Only as tall as the saves need, like the game's own screens, up to a scrolling maximum.
-            float height = Mathf.Clamp(100 + 56 + 12 + Entries.Count * 75, PanelMinHeight, PanelHeight);
-            _panel.sizeDelta = new Vector2(PanelWidth, height);
+            _listHeight = Mathf.Clamp(100 + 56 + 12 + Entries.Count * 75, PanelMinHeight, PanelHeight);
+            if (_modal == null) SetPanelHeight(_listHeight);
+        }
+
+        private static void SetPanelHeight(float height, float width = PanelWidth)
+        {
+            _panel.sizeDelta = new Vector2(width, height);
             if (_status != null) _status.rectTransform.anchoredPosition = new Vector2(0, -height / 2 - 34);
         }
 
@@ -497,9 +558,11 @@ namespace PaperTrail
                 SaveKind.Auto => $"AutoSave {s.AutoNumber}",
                 SaveKind.Sleep => "Sleep",
                 SaveKind.BeforeRestore => "Kept",
+                SaveKind.Milestone => "Key moment",
+                SaveKind.Safeguard => "Safeguard",
                 _ => "Manual",
             };
-            return (s.Pinned ? "★ " : "") + kind;
+            return (s.Suspect ? "\u26A0 " : "") + (s.Pinned ? "\u2605 " : "") + kind;
         }
 
         /// <summary>Money the way the game's save slots show it: $62.2K in green, $1.2M in gold.</summary>
@@ -546,11 +609,28 @@ namespace PaperTrail
             _pin.SetEnabled(!_saving && isSnap);
             _delete.SetEnabled(!_saving && isSnap);
             _pin.Text.text = isSnap && snap.Pinned ? "Unpin" : "Pin";
-            _save?.SetEnabled(!_saving);
-            _overwrite?.SetEnabled(!_saving && isSnap);
-            if (isSnap && snap.SaveHadErrors && !_saving)
+            int wait = _mode == Mode.Save ? Mathf.CeilToInt(Mod.CooldownLeft()) : 0;
+            bool atLimit = _mode == Mode.Save && Store.List(_slot).Count(x => x.Kind == SaveKind.Manual) >= Settings.ManualSavesKept;
+            bool newRow = _mode == Mode.Save && _selected == 0 && !isSnap;
+            _save?.SetEnabled(!_saving && wait <= 0 && !(atLimit && newRow));
+            _overwrite?.SetEnabled(!_saving && isSnap && wait <= 0);
+            if (wait > 0 && !_saving)
+                Note($"Wait {wait}s before saving again.", true);
+            else if (atLimit && newRow && !_saving)
+                Note($"You have {Settings.ManualSavesKept} manual saves, the limit. Delete one, or overwrite a save, to make room.", true);
+            else if (_waitShown && !_saving)
+                Note(DefaultNote());
+            _waitShown = wait > 0 || (atLimit && newRow);
+            if (wait <= 0 && isSnap && snap.Suspect && !_saving)
+                Note("This save looks incomplete: it has far less in it than the save before it. Older saves were kept.", true);
+            else if (wait <= 0 && isSnap && snap.SaveHadErrors && !_saving)
                 Note("The game reported errors while making this save.", true);
         }
+
+        private static bool _waitShown;
+
+        private static string DefaultNote()
+            => _mode == Mode.Save ? $"The newest {Settings.AutoSavesKept} auto-saves are kept. Manual, sleep and pinned saves are never removed." : "";
 
         private static SnapshotInfo Current => _selected >= 0 && _selected < Entries.Count ? Entries[_selected].Snap : null;
 
@@ -564,21 +644,37 @@ namespace PaperTrail
             if (snap == null && !(Entries.Count == 0 && SaveInfoOf(_slot) != null)) return;
             // The newest snapshot of a slot nothing has saved over since is the slot itself: start it as it is.
             var restore = snap;
-            var newest = Store.List(_slot).FirstOrDefault();
-            if (snap != null && newest != null && snap.Folder == newest.Folder && !Store.SlotNewerThanSnapshots(_slot)) restore = null;
+            if (snap != null && Store.SlotMatches(_slot, snap)) restore = null;      // already what is on disk
             int slot = _slot;
             if (Mod.Instance.CurrentSlot > 0)
             {
-                Confirm("Load this save?", "Anything since your last save will be lost.", "Load", _ =>
-                {
-                    CloseIfOpen();
-                    Mod.LoadFromGame(slot, restore);
-                });
+                Modal("Load this save?", "Anything since your last save will be lost.", null, "Load",
+                      _ => Mod.LoadNow(slot, restore, true), danger: true);
                 return;
             }
+            Mod.LoadNow(slot, restore, false);
+        }
+
+        /// <summary>
+        /// A load has been chosen: nothing more can be clicked, and the screen drops below the game's loading
+        /// screen, which fades in over it. The screen stays until the next scene starts, so nothing else - the main
+        /// menu least of all - shows in between.
+        /// </summary>
+        public static void CoverForLoading()
+        {
+            if (!_open || _root == null) return;
             _hiddenMenuScreen = null;           // the game is loading: nothing to bring back
-            CloseIfOpen();
-            Mod.LoadNow(slot, restore);
+            if (_modal != null) CloseModal();
+            _saving = true;
+            foreach (var b in new[] { _load, _save, _overwrite, _rename, _pin, _delete, _prevCampaign, _nextCampaign })
+                b?.SetEnabled(false);
+            try
+            {
+                var canvas = _root.GetComponent<Canvas>();
+                var loading = Singleton<LoadingScreen>.Instance.Canvas;
+                if (canvas != null && loading != null) canvas.sortingOrder = loading.sortingOrder - 1;
+            }
+            catch (Exception e) { Mod.Log.Warning("could not put the save screen under the loading screen: " + e.Message); }
         }
 
         private static void NewSave() => Ask("New save", "Give it a name, or leave it blank.", "", "Save", note => StartSave(note, null));
@@ -587,7 +683,7 @@ namespace PaperTrail
         {
             var snap = Current;
             if (snap == null) { NewSave(); return; }
-            Confirm("Overwrite this save?", Escape(Store.Describe(snap)), "Overwrite", _ => StartSave(snap.Note, snap));
+            Modal("Overwrite this save?", Escape(Store.Describe(snap)), null, "Overwrite", _ => StartSave(snap.Note, snap), danger: true);
         }
 
         private static void StartSave(string note, SnapshotInfo replace)
@@ -604,7 +700,7 @@ namespace PaperTrail
 
         private static void OnSnapshot(SnapshotInfo info)
         {
-            if (_root == null) return;
+            if (!_open || _root == null) return;
             if (_saving && _mode == Mode.Save) { CloseIfOpen(); return; }
             Refresh();
         }
@@ -626,6 +722,7 @@ namespace PaperTrail
             var snap = Current;
             if (snap == null) return;
             snap.Pinned = !snap.Pinned;
+            snap.PinnedByUser = snap.Pinned;
             Store.Update(snap);
             Refresh();
         }
@@ -634,11 +731,11 @@ namespace PaperTrail
         {
             var snap = Current;
             if (snap == null) return;
-            Confirm("Delete this save?", Escape(Store.Describe(snap)) + "\nThis can't be undone.", "Delete", _ =>
+            Modal("Delete this save?", Escape(Store.Describe(snap)) + "\nThis can't be undone.", null, "Delete", _ =>
             {
                 try { Store.Delete(snap); } catch (Exception e) { Mod.Log.Warning("delete failed: " + e.Message); }
                 Refresh();
-            });
+            }, danger: true);
         }
 
         // ---------------------------------------------------------------- dialogs, in the same panel style
@@ -647,58 +744,100 @@ namespace PaperTrail
 
         private static void Ask(string title, string message, string text, string ok, Action<string> onOk) => Modal(title, message, text ?? "", ok, onOk);
 
-        private static void Modal(string title, string message, string input, string ok, Action<string> onOk)
+        private const float DialogHeight = 250f, DialogWidth = 440f;
+
+        /// <summary>
+        /// A question, shown as a page of the same panel in place of the list, so there is never one menu on top
+        /// of another: the list and its buttons step aside and come back when it is answered.
+        /// </summary>
+        private static void Modal(string title, string message, string input, string ok, Action<string> onOk, bool danger = false)
         {
             CloseModal();
-            var root = _root.GetComponent<RectTransform>();
-            var dim = Ui.Place(Ui.Node("Modal", root), 0, 0, 1, 1);
-            Ui.Box(dim, new Color(0, 0, 0, 0.5f));
-            _modal = dim.gameObject;
+            _modal = _dialogPage.gameObject;
+            _listPage.gameObject.SetActive(false);
+            _dialogPage.gameObject.SetActive(true);
+            _title.text = title;
+            SetPanelHeight(DialogHeight, DialogWidth);
 
-            var box = Ui.Node("Box", dim);
-            box.sizeDelta = new Vector2(480, input != null ? 210 : 180);
-            Background(box);
-            TitleText(box, title);
-            var msg = Ui.Label(Ui.Place(Ui.Node("Message", box), 0, 0, 1, 1, 30, input != null ? 96 : 60, 30, 62), message, 14,
-                               new Color(0.8f, 0.8f, 0.8f), TextAlignmentOptions.Top);
+            // The message sits where the game puts the instructions above its name box: small, light grey.
+            var msg = Ui.Label(Ui.Place(Ui.Node("Message", _dialogPage), 0, 1, 1, 1, 30, input != null ? -108 : -150, 30, 62), message, 14,
+                               new Color32(168, 168, 168, 255), TextAlignmentOptions.Top);
             msg.enableWordWrapping = true;
-            if (input != null) _modalInput = InputBox(Ui.Place(Ui.Node("Input", box), 0, 0, 1, 0, 40, 58, 40, -88), input);
+            if (input != null) _modalInput = InputBox(_dialogPage, input);
 
-            var bar = Ui.Place(Ui.Node("Buttons", box), 0, 0, 1, 0, 20, 16, 20, -44);
-            var row = bar.gameObject.AddComponent<HorizontalLayoutGroup>();
-            row.spacing = 10;
-            row.childAlignment = TextAnchor.MiddleCenter;
-            row.childControlWidth = false;
-            row.childControlHeight = false;
-            row.childForceExpandWidth = false;
-            foreach (var (label, action) in new (string, Action)[] { (ok, ConfirmModal), ("Cancel", CloseModal) })
-            {
-                var rt = Ui.Node(label, bar);
-                rt.sizeDelta = new Vector2(110, 26);
-                SmallButton(rt, label, action);
-            }
+            DialogButton(new Vector2(0.5f, 0), new Vector2(-88, 48), "Back", CloseModal, new Color32(113, 113, 113, 255));
+            var confirmColour = danger ? new Color32(255, 103, 93, 255) : new Color32(39, 130, 24, 255);
+            DialogButton(new Vector2(0.5f, 0), new Vector2(88, 48), ok, ConfirmModal, confirmColour);
             _modalOk = onOk;
-            if (_modalInput != null) _modalInput.ActivateInputField();
+            _focusPending = _modalInput != null;
+            _focusFrame = Time.frameCount + 2;
         }
 
-        /// <summary>A name box in the game's rounded style.</summary>
-        private static TMP_InputField InputBox(RectTransform rt, string text)
+        /// <summary>The game's 150x40 dialog button, in its colours: grey for Back, green or red to confirm.</summary>
+        private static void DialogButton(Vector2 anchor, Vector2 position, string label, Action onClick, Color colour)
         {
-            Image bg = null;
-            var rounded = Templates.SmallButton != null ? Templates.SmallButton.GetComponent<Image>() : null;
-            bg = rt.gameObject.AddComponent<Image>();
-            if (rounded != null) { bg.sprite = rounded.sprite; bg.type = Image.Type.Sliced; }
-            bg.color = new Color(0, 0, 0, 0.45f);
-            var area = Ui.Place(Ui.Node("TextArea", rt), 0, 0, 1, 1, 10, 3, 10, 3);
-            area.gameObject.AddComponent<RectMask2D>();
-            var label = Ui.Label(area, "", 16, Color.white);
-            label.enableWordWrapping = false;
-            label.overflowMode = TextOverflowModes.Overflow;
-            var input = rt.gameObject.AddComponent<TMP_InputField>();
-            input.textViewport = area;
-            input.textComponent = label;
-            if (Ui.Font != null) input.fontAsset = Ui.Font;
-            input.pointSize = 16;
+            RectTransform rt;
+            Button button;
+            TextMeshProUGUI text;
+            if (Templates.DialogConfirm != null)
+            {
+                rt = Templates.Make(Templates.DialogConfirm, _dialogPage).GetComponent<RectTransform>();
+                button = rt.GetComponent<Button>();
+                text = rt.GetComponentInChildren<TextMeshProUGUI>(true);
+                rt.GetComponent<Image>().color = colour;
+                var frame = rt.Find("Selected Frame");
+                if (frame != null) frame.gameObject.SetActive(false);
+            }
+            else
+            {
+                rt = Ui.Node(label, _dialogPage);
+                var b = Ui.MakeButton(rt, label, onClick, 18);
+                rt.GetComponent<Image>().color = colour;
+                button = b.Button;
+                text = b.Text;
+            }
+            rt.anchorMin = rt.anchorMax = anchor;
+            rt.sizeDelta = new Vector2(150, 40);
+            rt.anchoredPosition = position;
+            text.text = label;
+            button.onClick = new Button.ButtonClickedEvent();
+            button.onClick.AddListener((UnityAction)onClick);
+        }
+
+        /// <summary>The game's own name box, copied from its organisation setup; a plain dark box if that was not found.</summary>
+        private static TMP_InputField InputBox(RectTransform parent, string text)
+        {
+            TMP_InputField input;
+            if (Templates.InputField != null)
+            {
+                var go = Templates.Make(Templates.InputField, parent);
+                var rt = go.GetComponent<RectTransform>();
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(0, -6);
+                rt.sizeDelta = new Vector2(380, 40);
+                input = go.GetComponent<TMP_InputField>();
+                var instructions = go.transform.Find("Instructions");
+                if (instructions != null) instructions.gameObject.SetActive(false);
+                var placeholder = go.transform.Find("Text Area/Placeholder")?.GetComponent<TextMeshProUGUI>();
+                if (placeholder != null) placeholder.text = "Name (optional)";
+                var frame = go.transform.Find("Selected Frame");
+                _inputFrame = frame != null ? frame.gameObject : null;
+                if (_inputFrame != null) _inputFrame.SetActive(false);
+            }
+            else
+            {
+                var rt = Ui.Place(Ui.Node("Input", parent), 0.5f, 0.5f, 0.5f, 0.5f);
+                rt.sizeDelta = new Vector2(380, 40);
+                rt.anchoredPosition = new Vector2(0, -6);
+                Ui.Box(rt, new Color32(55, 55, 55, 255));
+                var area = Ui.Place(Ui.Node("TextArea", rt), 0, 0, 1, 1, 10, 2, 10, 2);
+                area.gameObject.AddComponent<RectMask2D>();
+                var label = Ui.Label(area, "", 18, Color.white, TextAlignmentOptions.Center);
+                label.enableWordWrapping = false;
+                input = rt.gameObject.AddComponent<TMP_InputField>();
+                input.textViewport = area;
+                input.textComponent = label;
+            }
             input.characterLimit = 60;
             input.text = text ?? "";
             return input;
@@ -714,10 +853,20 @@ namespace PaperTrail
 
         private static void CloseModal()
         {
-            if (_modal != null) Object.Destroy(_modal);
+            bool was = _modal != null;
+            if (was)
+            {
+                for (int i = _dialogPage.childCount - 1; i >= 0; i--) Object.Destroy(_dialogPage.GetChild(i).gameObject);
+                _dialogPage.gameObject.SetActive(false);
+                _listPage.gameObject.SetActive(true);
+                _title.text = _mode == Mode.Save ? "Save Game" : "Load Game";
+                SetPanelHeight(_listHeight);
+            }
             _modal = null;
             _modalInput = null;
             _modalOk = null;
+            _inputFrame = null;
+            _focusPending = false;
             GameInput.IsTyping = false;
         }
     }

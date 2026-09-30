@@ -29,27 +29,55 @@ namespace PaperTrail
             catch (Exception e) { Mod.Log.Warning($"could not add the save screen to the {scene} scene: {e.Message}"); }
         }
 
-        private static Button FindButton(string label, Transform under = null)
+        /// <summary>
+        /// Every button carrying this label. The game keeps old, hidden copies of some (the main menu has a
+        /// "Deprecated" Continue), so callers take the visible one, or all of them.
+        /// </summary>
+        private static Button[] FindButtons(string label, Transform under = null)
         {
             var buttons = under != null ? under.GetComponentsInChildren<Button>(true).ToArray()
                                         : Object.FindObjectsOfType<Button>(true).ToArray();
-            return buttons.FirstOrDefault(b =>
+            return buttons.Where(b =>
             {
                 var t = b.GetComponentInChildren<TextMeshProUGUI>(true);
                 return t != null && string.Equals(t.text?.Trim(), label, StringComparison.OrdinalIgnoreCase);
-            });
+            }).OrderByDescending(b => b.gameObject.activeInHierarchy).ToArray();
+        }
+
+        private static Button FindButton(string label, Transform under = null) => FindButtons(label, under).FirstOrDefault();
+
+        private static string PathOf(Transform t)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            for (; t != null; t = t.parent) parts.Add(t.name);
+            parts.Reverse();
+            return string.Join("/", parts);
+        }
+
+        /// <summary>For the dev preview: presses the visible Continue the way a click does.</summary>
+        public static bool PressContinue()
+        {
+            var b = FindButtons("Continue").FirstOrDefault(x => x.gameObject.activeInHierarchy);
+            if (b == null) return false;
+            b.onClick.Invoke();
+            return true;
         }
 
         /// <summary>The main menu's Continue opens the load screen instead of the game's slot list.</summary>
         private static void AttachMainMenu()
         {
-            var cont = FindButton("Continue");
-            if (cont == null) { Mod.Log.Warning("main menu: no Continue button found - the load screen is not on the menu"); return; }
-            Ui.FindFont(cont);
-            cont.onClick = new Button.ButtonClickedEvent();
-            cont.onClick.AddListener((UnityAction)new Action(() => SaveScreen.Open(SaveScreen.Mode.Load)));
-            cont.interactable = true;
-            Mod.Log.Msg("main menu: Continue opens the Paper Trail load screen");
+            var buttons = FindButtons("Continue");
+            if (buttons.Length == 0) { Mod.Log.Warning("main menu: no Continue button found - the load screen is not on the menu"); return; }
+            Ui.FindFont(buttons[0]);
+            foreach (var cont in buttons)
+            {
+                cont.onClick = new Button.ButtonClickedEvent();
+                cont.onClick.AddListener((UnityAction)new Action(() => SaveScreen.Open(SaveScreen.Mode.Load)));
+                cont.interactable = true;
+            }
+            var visible = buttons.FirstOrDefault(b => b.gameObject.activeInHierarchy);
+            Mod.Log.Msg($"main menu: Continue opens the Paper Trail load screen ({buttons.Length} Continue button(s) hooked; "
+                      + (visible != null ? "visible one: " + PathOf(visible.transform) : "none of them is visible yet") + ")");
         }
 
         /// <summary>A Save button below Resume in the pause menu, copied from it so it looks the same.</summary>
