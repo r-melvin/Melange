@@ -51,6 +51,22 @@ Needs MelonLoader 0.7.x. Put `PaperTrail.dll` in the game's `Mods` folder.
 MelonLoader installed and run once, so the interop assemblies exist. Shared build settings are in
 `Directory.Build.props`.
 
+## Releasing a mod
+
+Each mod is released on its own, tagged `<mod-name>-v<version>` (for example `paper-trail-v0.1.0`). The version is
+the one in the mod's `MelonInfo` line. The mods build against the game's own generated assemblies, which can't be
+stored in a public repo, so the release is built on your machine:
+
+```
+export S1_GAME_DIR="/path/to/Schedule I"
+scripts/release.sh PaperTrail --dry-run   # build and package only
+scripts/release.sh PaperTrail             # tag, push and publish the GitHub release
+```
+
+It refuses to run with uncommitted changes, off `main`, out of sync with origin, or if the tag already exists.
+A new mod joins the pipeline by having its own folder with `<Mod>/<Mod>.csproj` and a `MelonInfo`. CI
+(`.github/workflows/check.yml`) checks that every mod declares a version and that a pushed tag matches it.
+
 ## Licence
 
 MIT - see [LICENSE](LICENSE).

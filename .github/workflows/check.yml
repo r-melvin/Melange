@@ -1,0 +1,32 @@
+name: check
+# The mods compile against the game's own interop assemblies, which cannot be stored in a public repo, so CI
+# cannot build them. It checks what it can: every mod has a MelonInfo, and no release tag disagrees with it.
+on:
+  push:
+    branches: [main]
+    tags: ['*-v*']
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Every mod declares its name and version
+        run: |
+          for proj in */*.csproj; do
+            mod=$(dirname "$proj")
+            grep -rhoE 'MelonInfo\(typeof\([^)]*\), *"[^"]+", *"[0-9]+\.[0-9]+\.[0-9]+"' "$mod" --include=*.cs | head -1 | grep -q . \
+              || { echo "::error::$mod has no MelonInfo with an x.y.z version"; exit 1; }
+          done
+      - name: A release tag matches the mod's version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF_NAME}"; ok=0
+          for proj in */*.csproj; do
+            mod=$(dirname "$proj")
+            info=$(grep -rhoE 'MelonInfo\(typeof\([^)]*\), *"[^"]+", *"[^"]+"' "$mod" --include=*.cs | head -1)
+            name=$(echo "$info" | sed -E 's/.*\), *"([^"]+)", *"([^"]+)"$/\1/')
+            version=$(echo "$info" | sed -E 's/.*\), *"([^"]+)", *"([^"]+)"$/\2/')
+            [ "$(echo "$name" | tr '[:upper:] ' '[:lower:]-')-v$version" = "$tag" ] && ok=1
+          done
+          [ $ok = 1 ] || { echo "::error::tag $tag matches no mod's name and version"; exit 1; }
