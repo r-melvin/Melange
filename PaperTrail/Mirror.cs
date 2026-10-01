@@ -65,6 +65,12 @@ namespace PaperTrail
 
         private static void Run()
         {
+            // Not while a snapshot is being written, deleted or restored: the pass would see it half done.
+            lock (Work.Disk) RunLocked();
+        }
+
+        private static void RunLocked()
+        {
             var deleted = new HashSet<string>(File.Exists(Tombstones) ? File.ReadAllLines(Tombstones) : Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
             int toCloud = 0, toLocal = 0, removed = 0;
             for (int slot = 1; slot <= 5; slot++)

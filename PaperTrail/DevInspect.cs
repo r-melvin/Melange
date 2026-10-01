@@ -155,6 +155,8 @@ namespace PaperTrail
                 yield return Wait(1.5f);
                 SaveScreen.Open(SaveScreen.Mode.Save);
                 yield return Wait(1f);
+                if (File.Exists(Path.Combine(MelonEnvironment.UserDataDirectory, "PaperTrail.limit")))
+                    yield return LimitScenario();
                 SaveScreen.DevSelect(0);
                 SaveScreen.DevPress("Save");                     // "+ New save" asks for a name
                 yield return Wait(1f);
@@ -177,6 +179,28 @@ namespace PaperTrail
                 Mod.Log.Msg("[preview] ingame-loading");
                 _secondPass = true;
             }
+        }
+
+        /// <summary>With the manual-save limit set low in the config: a new manual save is refused, an overwrite is not.</summary>
+        private static IEnumerator LimitScenario()
+        {
+            int slot = Mod.Instance.CurrentSlot;
+            int manual = Store.List(slot).Count(x => x.Kind == SaveKind.Manual);
+            Mod.Log.Msg($"[limit] manual saves={manual} limit={Settings.ManualSavesKept} cooldownLeft={Mod.CooldownLeft():0}s");
+            SaveScreen.DevSelect(0);
+            yield return Wait(0.3f);
+            Mod.Log.Msg("[limit] new-save row: " + SaveScreen.DevStatus());
+            int row = 1;
+            SaveScreen.DevSelect(row);
+            yield return Wait(0.3f);
+            Mod.Log.Msg("[limit] existing-save row: " + SaveScreen.DevStatus());
+            bool refused = !Mod.Instance.RequestManualSave("limit test", null);
+            Mod.Log.Msg($"[limit] new manual save refused = {refused}");
+            var target = Store.List(slot).FirstOrDefault(x => x.Kind == SaveKind.Manual);
+            bool overwrote = target != null && Mod.Instance.RequestManualSave("limit test overwrite", target);
+            Mod.Log.Msg($"[limit] overwrite accepted = {overwrote}");
+            yield return Wait(15f);
+            Mod.Log.Msg($"[limit] manual saves after={Store.List(slot).Count(x => x.Kind == SaveKind.Manual)}");
         }
 
         public static IEnumerator Run(string scene)

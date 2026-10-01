@@ -212,10 +212,11 @@ namespace PaperTrail
 
         private static void DeleteLocked(SnapshotInfo info)
         {
-            if (Directory.Exists(info.Folder)) Directory.Delete(info.Folder, true);
+            // Remembered first: a sync that sees the cloud copy must know it was deleted on purpose.
             string slot = Path.GetFileName(Path.GetDirectoryName(info.Folder)) ?? "";
             if (slot.StartsWith("Slot_", StringComparison.Ordinal) && int.TryParse(slot.Substring(5), out int n))
                 Mirror.Deleted(n, Path.GetFileName(info.Folder));
+            if (Directory.Exists(info.Folder)) Directory.Delete(info.Folder, true);
             Mirror.Request();
         }
 

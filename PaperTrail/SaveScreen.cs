@@ -92,6 +92,11 @@ namespace PaperTrail
         public static void DevConfirm() { if (_modal != null) ConfirmModal(); }
 
         /// <summary>For the dev preview: what the screen looks like from the inside.</summary>
+        public static string DevStatus()
+            => $"note=\"{_status?.text}\" save={(_save != null && _save.Button.interactable)} overwrite={(_overwrite != null && _overwrite.Button.interactable)} selected={_selected}";
+
+        public static SnapshotInfo DevCurrent => Current;
+
         public static string DebugState()
         {
             if (!_open || _root == null) return "closed";
