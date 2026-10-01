@@ -17,7 +17,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.Events;
 
-[assembly: MelonInfo(typeof(PaperTrail.Mod), "Paper Trail", "0.1.2", "r-melvin")]
+[assembly: MelonInfo(typeof(PaperTrail.Mod), "Paper Trail", "0.1.3", "r-melvin")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace PaperTrail
