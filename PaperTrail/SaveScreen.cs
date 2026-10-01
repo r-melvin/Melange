@@ -266,7 +266,10 @@ namespace PaperTrail
             button.navigation = nav;
         }
 
-        private const float WheelStep = 75f;              // one row (70) and its spacing
+        // The list's metrics: the layout below uses them, and scrolling a row into view works out where it is from them
+        // (the stripped game build cannot measure it: RectTransformUtility.CalculateRelativeRectTransformBounds is gone).
+        private const float RowHeight = 70f, RowSpacing = 5f, ListPadding = 6f;
+        private const float WheelStep = RowHeight + RowSpacing;
         private const float EaseRate = 16f;               // higher is snappier; the wheel lands in about a fifth of a second
         private const int PageRows = 5;
 
@@ -355,11 +358,11 @@ namespace PaperTrail
         /// <summary>Scrolls the list just far enough that the row is fully in view, with a little room around it.</summary>
         private static void ScrollIntoView(int index)
         {
-            if (_content == null || _viewport == null || index < 0 || index >= Entries.Count || Entries[index].Row == null) return;
+            if (_content == null || _viewport == null || index < 0 || index >= Entries.Count) return;
             try
             {
-                var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(_content, Entries[index].Row);
-                float top = -bounds.max.y, bottom = -bounds.min.y;            // distances down from the top of the list
+                float top = ListPadding + index * (RowHeight + RowSpacing);       // distance down from the top of the list
+                float bottom = top + RowHeight;
                 float view = _viewport.rect.height, margin = 8f;
                 float offset = _scrollTarget;
                 if (top - margin < offset) offset = top - margin;
@@ -602,8 +605,9 @@ namespace PaperTrail
             content.offsetMin = Vector2.zero;
             content.offsetMax = Vector2.zero;
             var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 5;                                     // the game's slot spacing
-            layout.padding = new RectOffset(6, 6, 6, 6);            // room for the selection frame, which overhangs a row by 5
+            layout.spacing = RowSpacing;                            // the game's slot spacing
+            int pad = (int)ListPadding;
+            layout.padding = new RectOffset(pad, pad, pad, pad);    // room for the selection frame, which overhangs a row by 5
             layout.childControlHeight = true;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
@@ -671,7 +675,9 @@ namespace PaperTrail
                 button = c.Find("Button").GetComponent<Button>();
                 entry.Frame = c.Find("Button/Selected Frame")?.gameObject;
                 var info = c.Find("Info");
-                Set(row.transform.Find("Index"), snap == null ? "+" : number.ToString());
+                var indexText = row.transform.Find("Index");
+                Set(indexText, snap == null ? "+" : number.ToString());
+                FitIndex(indexText);
                 if (snap == null)
                 {
                     Set(info.Find("Organisation"), "New save");
@@ -705,11 +711,26 @@ namespace PaperTrail
             }
             entry.Row = row.GetComponent<RectTransform>();
             var le = row.GetComponent<LayoutElement>() ?? row.AddComponent<LayoutElement>();
-            le.preferredHeight = 70;
+            le.preferredHeight = RowHeight;
             button.onClick = new Button.ButtonClickedEvent();
             button.onClick.AddListener((UnityAction)new Action(() => Clicked(index)));
             NoNavigation(button);
             Entries.Add(entry);
+        }
+
+        /// <summary>
+        /// The big faint numeral beside a row is sized for one digit. Left to wrap, "10" put its zero on a second line
+        /// over the row below, so it shrinks to fit its box instead.
+        /// </summary>
+        private static void FitIndex(Transform t)
+        {
+            var tmp = t != null ? t.GetComponent<TextMeshProUGUI>() : null;
+            if (tmp == null) return;
+            tmp.enableWordWrapping = false;
+            tmp.overflowMode = TextOverflowModes.Overflow;
+            tmp.enableAutoSizing = true;
+            tmp.fontSizeMax = tmp.fontSize;
+            tmp.fontSizeMin = Mathf.Max(14f, tmp.fontSize * 0.4f);
         }
 
         private static void Set(Transform t, string text)
