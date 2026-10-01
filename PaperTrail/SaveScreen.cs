@@ -32,6 +32,7 @@ namespace PaperTrail
         {
             public SnapshotInfo Snap;        // null: the "New save" row
             public GameObject Frame;         // the game's blue selection frame
+            public RectTransform Row;        // the row itself, to scroll it into view
         }
 
         private const string UiElement = "PaperTrail";
@@ -51,6 +52,12 @@ namespace PaperTrail
         private static SmallBtn _load, _save, _overwrite, _rename, _pin, _delete, _prevCampaign, _nextCampaign;
         private static GameObject _modal;
         private static RectTransform _listPage, _dialogPage;
+        private static ScrollRect _scroll;
+        private static RectTransform _viewport;
+        private static float _scrollTarget, _scrollWritten;
+        private static bool _wheelOurs;                  // we read the wheel (Unity's ScrollRect jumps a notch at a time)
+        private static KeyCode _repeatKey;
+        private static float _repeatAt;
         private static float _listHeight = PanelHeight;
         private static bool _focusPending;
         private static int _focusFrame;
@@ -157,6 +164,8 @@ namespace PaperTrail
             _title = _campaign = _status = null;
             _load = _save = _overwrite = _rename = _pin = _delete = _prevCampaign = _nextCampaign = null;
             _listPage = _dialogPage = null;
+            _scroll = null;
+            _viewport = null;
             _inputFrame = null;
             _modalOk = null;
         }
@@ -234,11 +243,130 @@ namespace PaperTrail
                 int wait = Mathf.CeilToInt(Mod.CooldownLeft());
                 if (wait != _lastWait) { _lastWait = wait; Select(_selected); }
             }
+            if (_modal == null && !_saving) NavigateWithKeys();
+            EaseScroll();
             bool typing = _modalInput != null && _modalInput.isFocused;
             GameInput.IsTyping = typing;
             if (_inputFrame != null) _inputFrame.SetActive(typing);
             if (_modal != null && _modalOk != null && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)))
                 ConfirmModal();
+        }
+
+        // ---------------------------------------------------------------- keys and scrolling
+
+        /// <summary>
+        /// The arrow keys drive the row selection here. Unity's own button navigation listens to them too and would
+        /// highlight a button as well (and Enter would then press it), so these buttons opt out of it.
+        /// </summary>
+        private static void NoNavigation(Button button)
+        {
+            if (button == null) return;
+            var nav = button.navigation;
+            nav.mode = Navigation.Mode.None;
+            button.navigation = nav;
+        }
+
+        private const float WheelStep = 75f;              // one row (70) and its spacing
+        private const float EaseRate = 16f;               // higher is snappier; the wheel lands in about a fifth of a second
+        private const int PageRows = 5;
+
+        /// <summary>True on the press, then again at a steady rate while the key is held.</summary>
+        private static bool Pressed(KeyCode key)
+        {
+            if (Input.GetKeyDown(key))
+            {
+                _repeatKey = key;
+                _repeatAt = Time.unscaledTime + 0.4f;
+                return true;
+            }
+            if (_repeatKey == key && Input.GetKey(key) && Time.unscaledTime >= _repeatAt)
+            {
+                _repeatAt = Time.unscaledTime + 0.06f;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Up and Down move the blue selection a row; PageUp and PageDown a page; Home and End the ends.</summary>
+        private static void NavigateWithKeys()
+        {
+            if (Entries.Count == 0) return;
+            try
+            {
+                int to = _selected;
+                if (Pressed(KeyCode.UpArrow)) to = _selected < 0 ? 0 : _selected - 1;
+                else if (Pressed(KeyCode.DownArrow)) to = _selected + 1;
+                else if (Input.GetKeyDown(KeyCode.PageUp)) to = _selected - PageRows;
+                else if (Input.GetKeyDown(KeyCode.PageDown)) to = _selected + PageRows;
+                else if (Input.GetKeyDown(KeyCode.Home)) to = 0;
+                else if (Input.GetKeyDown(KeyCode.End)) to = Entries.Count - 1;
+                else return;
+
+                to = Mathf.Clamp(to, 0, Entries.Count - 1);
+                if (to == _selected) return;
+                Select(to);
+                ScrollIntoView(to);
+            }
+            catch (Exception e) { Mod.Log.Warning("save screen: keys: " + e.Message); }
+        }
+
+        /// <summary>Slides the list towards where the wheel or the keys want it, instead of jumping a notch at a time.</summary>
+        private static void EaseScroll()
+        {
+            if (_scroll == null || _content == null || _viewport == null) return;
+            try
+            {
+                float now = _content.anchoredPosition.y;
+                if (Mathf.Abs(now - _scrollWritten) > 0.5f) _scrollTarget = now;        // the user dragged the list
+
+                if (_wheelOurs && _modal == null)
+                {
+                    float wheel = 0f;
+                    try
+                    {
+                        if (RectTransformUtility.RectangleContainsScreenPoint(_panel, Input.mousePosition, null))
+                            wheel = Input.mouseScrollDelta.y;
+                    }
+                    catch
+                    {
+                        // No legacy input here: hand the wheel back to Unity's own scrolling.
+                        _wheelOurs = false;
+                        _scroll.scrollSensitivity = 25f;
+                    }
+                    if (_wheelOurs) _scroll.scrollSensitivity = 0f;
+                    if (wheel != 0f) _scrollTarget -= wheel * WheelStep;
+                }
+
+                float max = Mathf.Max(0f, _content.rect.height - _viewport.rect.height);
+                _scrollTarget = Mathf.Clamp(_scrollTarget, 0f, max);
+                if (Mathf.Abs(_scrollTarget - now) < 0.3f)
+                {
+                    if (now != _scrollTarget) _content.anchoredPosition = new Vector2(_content.anchoredPosition.x, _scrollTarget);
+                    _scrollWritten = _scrollTarget;
+                    return;
+                }
+                float next = now + (_scrollTarget - now) * (1f - Mathf.Exp(-EaseRate * Time.unscaledDeltaTime));
+                _content.anchoredPosition = new Vector2(_content.anchoredPosition.x, next);
+                _scrollWritten = next;
+            }
+            catch (Exception e) { Mod.Log.Warning("save screen: scrolling: " + e.Message); }
+        }
+
+        /// <summary>Scrolls the list just far enough that the row is fully in view, with a little room around it.</summary>
+        private static void ScrollIntoView(int index)
+        {
+            if (_content == null || _viewport == null || index < 0 || index >= Entries.Count || Entries[index].Row == null) return;
+            try
+            {
+                var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(_content, Entries[index].Row);
+                float top = -bounds.max.y, bottom = -bounds.min.y;            // distances down from the top of the list
+                float view = _viewport.rect.height, margin = 8f;
+                float offset = _scrollTarget;
+                if (top - margin < offset) offset = top - margin;
+                else if (bottom + margin > offset + view) offset = bottom + margin - view;
+                _scrollTarget = Mathf.Max(0f, offset);
+            }
+            catch (Exception e) { Mod.Log.Warning("save screen: scroll into view: " + e.Message); }
         }
 
         // ---------------------------------------------------------------- campaigns
@@ -449,10 +577,12 @@ namespace PaperTrail
             else
             {
                 var b = Ui.MakeButton(Ui.Place(Ui.Node("Button", rt), 0, 0, 1, 1), label, onClick, 13);
+                NoNavigation(b.Button);
                 return new SmallBtn { Button = b.Button, Text = b.Text };
             }
             button.onClick = new Button.ButtonClickedEvent();
             button.onClick.AddListener((UnityAction)onClick);
+            NoNavigation(button);
             var colors = button.colors;
             colors.disabledColor = colors.normalColor;      // a disabled button only fades its text, as the game's do
             button.colors = colors;
@@ -484,7 +614,12 @@ namespace PaperTrail
             scroll.content = content;
             scroll.horizontal = false;
             scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.inertia = false;                    // dragging follows the pointer exactly; the wheel is eased in Tick
             scroll.scrollSensitivity = 25f;
+            _scroll = scroll;
+            _viewport = viewport;
+            _scrollTarget = _scrollWritten = 0f;
+            _wheelOurs = true;
             return content;
         }
 
@@ -568,10 +703,12 @@ namespace PaperTrail
                 Ui.Box(frame, new Color(0, 0.71f, 1f, 0.35f), false);
                 entry.Frame = frame.gameObject;
             }
+            entry.Row = row.GetComponent<RectTransform>();
             var le = row.GetComponent<LayoutElement>() ?? row.AddComponent<LayoutElement>();
             le.preferredHeight = 70;
             button.onClick = new Button.ButtonClickedEvent();
             button.onClick.AddListener((UnityAction)new Action(() => Clicked(index)));
+            NoNavigation(button);
             Entries.Add(entry);
         }
 
@@ -628,6 +765,7 @@ namespace PaperTrail
             _lastClick = Time.unscaledTime;
             _lastClickIndex = index;
             Select(index);
+            ScrollIntoView(index);
             if (!twice) return;
             if (_mode == Mode.Save) { if (Entries[index].Snap == null) NewSave(); else Overwrite(); }
             else Load();
