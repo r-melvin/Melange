@@ -137,6 +137,7 @@ namespace PaperTrail
                 try { _hiddenMenuScreen = MenuScreen.Current; if (_hiddenMenuScreen != null) _hiddenMenuScreen.Close(); }
                 catch { _hiddenMenuScreen = null; }
 
+            ForgetWidgets();            // a screen the game destroyed with its scene never got to CloseIfOpen
             Build();
             _open = true;
             Refresh();
@@ -145,6 +146,19 @@ namespace PaperTrail
             GameInput.RegisterExitListener(_exit, 100);
             TakeInput();
             Mod.SnapshotTaken += OnSnapshot;
+        }
+
+        /// <summary>Drops every reference to the panel's widgets: they are destroyed with the screen, or with the scene.</summary>
+        private static void ForgetWidgets()
+        {
+            _panel = null;
+            _group = null;
+            _content = null;
+            _title = _campaign = _status = null;
+            _load = _save = _overwrite = _rename = _pin = _delete = _prevCampaign = _nextCampaign = null;
+            _listPage = _dialogPage = null;
+            _inputFrame = null;
+            _modalOk = null;
         }
 
         public static void CloseIfOpen()
@@ -159,6 +173,7 @@ namespace PaperTrail
             _root = null;
             _modal = null;
             _modalInput = null;
+            ForgetWidgets();
             Entries.Clear();
             _saving = false;
             if (_hiddenMenuScreen != null)
@@ -321,6 +336,14 @@ namespace PaperTrail
                 _save = Add("Save", NewSave);
                 _overwrite = Add("Overwrite", Overwrite);
             }
+            else
+            {
+                // Only Save mode has these. They are static, so a Save screen used earlier in the session (and
+                // destroyed with its scene) would still be here, and Select / CoverForLoading would reach for a
+                // dead button: the Load screen at the main menu then threw and the load never started.
+                _save = null;
+                _overwrite = null;
+            }
             _load = Add("Load", Load);
             _rename = Add("Rename", Rename);
             _pin = Add("Pin", TogglePin);
@@ -398,8 +421,14 @@ namespace PaperTrail
             public TextMeshProUGUI Text;
             public void SetEnabled(bool on)
             {
-                Button.interactable = on;
-                Text.alpha = on ? 1f : 0.35f;
+                // The game destroys a screen's buttons with its scene. A button that is gone is skipped, and a failed
+                // tweak here must never stop what the caller is doing (CoverForLoading runs this on the way to a load).
+                try
+                {
+                    if (Button != null) Button.interactable = on;
+                    if (Text != null) Text.alpha = on ? 1f : 0.35f;
+                }
+                catch (Exception e) { Mod.Log.Warning("save screen: could not update a button: " + e.Message); }
             }
         }
 
