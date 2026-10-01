@@ -27,7 +27,7 @@ if git rev-parse -q --verify "refs/tags/$tag" >/dev/null || git ls-remote --tags
 fi
 
 out=$(mktemp -d)
-dotnet build "$mod/$mod.csproj" -c Release -p:GameDir="$S1_GAME_DIR" -o "$out" --nologo -v q
+dotnet build "$mod/$mod.csproj" -c Release -p:GameDir="$S1_GAME_DIR" -o "$out" --nologo -v q --no-incremental
 dll="$out/$mod.dll"; [ -f "$dll" ] || { echo "build produced no $mod.dll"; exit 1; }
 zip="$out/$mod-$version.zip"
 ( cd "$out" && python3 -c "import zipfile,sys;z=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED);z.write(sys.argv[2],'Mods/'+sys.argv[2]);z.close()" "$zip" "$mod.dll" )

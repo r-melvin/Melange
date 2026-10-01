@@ -49,7 +49,7 @@ Needs MelonLoader 0.7.x. Put `PaperTrail.dll` in the game's `Mods` folder.
 
 `dotnet build -c Release -p:GameDir="<Schedule I folder>"` (or set `S1_GAME_DIR`). The game needs
 MelonLoader installed and run once, so the interop assemblies exist. Shared build settings are in
-`Directory.Build.props`.
+`Directory.Build.props`. Add `-p:Dev=true` to compile in Paper Trail's test driver (never in releases).
 
 ## Releasing a mod
 

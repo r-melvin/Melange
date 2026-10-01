@@ -71,6 +71,7 @@ namespace PaperTrail
 
         public static bool IsOpen => _open;
 
+#if PT_DEV
         /// <summary>For the dev preview: presses a button by its label, as a click does.</summary>
         public static bool DevPress(string label)
         {
@@ -96,7 +97,9 @@ namespace PaperTrail
             => $"note=\"{_status?.text}\" save={(_save != null && _save.Button.interactable)} overwrite={(_overwrite != null && _overwrite.Button.interactable)} selected={_selected}";
 
         public static SnapshotInfo DevCurrent => Current;
+#endif
 
+#if PT_DEV
         public static string DebugState()
         {
             if (!_open || _root == null) return "closed";
@@ -105,6 +108,7 @@ namespace PaperTrail
                  + $"alpha={_group?.alpha} scale={_panel?.localScale.x} rows={Entries.Count} templates={Templates.Ready} "
                  + $"screen={Screen.width}x{Screen.height} rect={_root.GetComponent<RectTransform>().rect.size}";
         }
+#endif
 
         // ---------------------------------------------------------------- open / close
 

@@ -3,6 +3,8 @@
   <PropertyGroup>
     <AssemblyName>PaperTrail</AssemblyName>
     <RootNamespace>PaperTrail</RootNamespace>
+    <!-- dotnet build -p:Dev=true compiles in the test driver (DevInspect); release builds never contain it. -->
+    <DefineConstants Condition="'$(Dev)' == 'true'">$(DefineConstants);PT_DEV</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Unity.TextMeshPro"><HintPath>$(Interop)/Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>

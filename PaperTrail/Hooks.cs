@@ -54,6 +54,7 @@ namespace PaperTrail
             return string.Join("/", parts);
         }
 
+#if PT_DEV
         /// <summary>For the dev preview: presses the visible Continue the way a click does.</summary>
         public static bool PressContinue()
         {
@@ -62,6 +63,7 @@ namespace PaperTrail
             b.onClick.Invoke();
             return true;
         }
+#endif
 
         /// <summary>The main menu's Continue opens the load screen instead of the game's slot list.</summary>
         private static void AttachMainMenu()

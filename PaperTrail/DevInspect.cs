@@ -1,3 +1,4 @@
+#if PT_DEV
 using System.Collections;
 using System.IO;
 using System.Linq;
@@ -207,6 +208,13 @@ namespace PaperTrail
         {
             if (!On) yield break;
             if (File.Exists(PreviewMarker)) { yield return Preview(scene); yield break; }
+            if (File.Exists(Path.Combine(MelonEnvironment.UserDataDirectory, "PaperTrail.importtest.marker")) && scene == "Menu")
+            {
+                yield return Wait(8f);
+                try { ImportTest(); } catch (System.Exception e) { Mod.Log.Msg("[import] failed: " + e); }
+                Mod.Log.Msg("[import] done");
+                yield break;
+            }
             yield return Wait(4f);
             if (scene == "Menu")
             {
@@ -214,6 +222,7 @@ namespace PaperTrail
                 var cont = Object.FindObjectOfType<ContinueScreen>(true);
                 if (cont != null) cont.Open();
                 Mod.Log.Msg("[inspect] continue-screen-open");
+                DumpCanvases("menu");
                 yield return Wait(6f);
                 if (cont != null) Write("PaperTrail.ui-continue.txt", Tree(cont.transform));
                 Mod.Log.Msg("[inspect] loading slot 1 for the pause menu");
@@ -222,14 +231,51 @@ namespace PaperTrail
             else if (scene == "Main")
             {
                 yield return Wait(20f);
+                DumpCanvases("world");
                 var pause = Singleton<PauseMenu>.Instance;
                 pause.Pause();
                 yield return Wait(2f);
                 Write("PaperTrail.ui-pause.txt", Tree(pause.transform));
+                DumpCanvases("paused");
                 Mod.Log.Msg("[inspect] pause-menu-open");
                 yield return Wait(6f);
                 Mod.Log.Msg("[inspect] done");
             }
+        }
+
+        /// <summary>Runs one of our snapshot zips through the game's own import code and compares it with the game's own export.</summary>
+        private static void ImportTest()
+        {
+            string dir = Path.Combine(MelonEnvironment.UserDataDirectory, "PaperTrail.importtest");
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            Directory.CreateDirectory(dir);
+            var snap = Store.List(1).FirstOrDefault(s => s.IsZip);
+            if (snap == null) { Mod.Log.Msg("[import] no zip snapshot to test"); return; }
+            string imported = Path.Combine(dir, "imported");
+            SaveImportButton.UnzipSaveFile(snap.ZipPath, imported);
+            string theirs = Path.Combine(dir, "game-export.zip");
+            SaveExportButton.ZipSaveFolder(Store.GameSlotFolder(1), theirs);
+            var ours = System.IO.Compression.ZipFile.OpenRead(snap.ZipPath);
+            var game = System.IO.Compression.ZipFile.OpenRead(theirs);
+            var a = ours.Entries.Where(e => e.Name.Length > 0).Select(e => e.FullName).ToList();
+            var b = game.Entries.Where(e => e.Name.Length > 0).Select(e => e.FullName).ToList();
+            Mod.Log.Msg($"[import] our zip: {a.Count} files, first={a.FirstOrDefault()}; game's own export: {b.Count} files, first={b.FirstOrDefault()}");
+            Mod.Log.Msg($"[import] only in the game's export: {string.Join(", ", b.Except(a).Take(6))}");
+            Mod.Log.Msg($"[import] only in ours: {string.Join(", ", a.Except(b).Take(6))}");
+            Mod.Log.Msg($"[import] the game's import extracted: {string.Join(", ", Directory.GetFileSystemEntries(imported).Select(Path.GetFileName).Take(8))} ({Directory.GetFiles(imported, "*", SearchOption.AllDirectories).Length} files)");
+            ours.Dispose(); game.Dispose();
+        }
+
+        private static void DumpCanvases(string tag)
+        {
+            var sb = new StringBuilder();
+            foreach (var c in Object.FindObjectsOfType<Canvas>(true))
+            {
+                string path = c.name;
+                for (var p = c.transform.parent; p != null; p = p.parent) path = p.name + "/" + path;
+                sb.AppendLine($"{c.sortingOrder,6} mode={c.renderMode} enabled={c.enabled} active={c.gameObject.activeInHierarchy} root={c.isRootCanvas} {path}");
+            }
+            Write($"PaperTrail.canvases-{tag}.txt", sb.ToString());
         }
 
         private static IEnumerator Wait(float seconds)
@@ -291,3 +337,4 @@ namespace PaperTrail
         }
     }
 }
+#endif
