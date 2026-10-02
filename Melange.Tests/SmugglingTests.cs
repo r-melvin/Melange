@@ -754,8 +754,8 @@ namespace Melange.Tests
         // ---- Dafydd's tricorn and eyepatch ----
 
         [Theory]
-        [InlineData(0.066, 1.0)]
-        [InlineData(0.099, 1.5)]
+        [InlineData(0.1, 1.0)]
+        [InlineData(0.15, 1.5)]
         [InlineData(0.01, PirateFit.MinScale)]
         [InlineData(1.0, PirateFit.MaxScale)]
         [InlineData(0.0, 1.0)]

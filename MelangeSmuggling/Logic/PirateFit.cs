@@ -4,17 +4,19 @@ using System.Globalization;
 namespace Melange.Smuggling
 {
     /// <summary>
-    /// How Dafydd's tricorn and eyepatch (scripts/art/build_pirate.py) are fitted to his head. The models are drawn for eyes
-    /// <see cref="ModelEyeSpacing"/> apart; at runtime the distance between his eyeballs scales them, and the hat sits a
+    /// How Dafydd's tricorn and eyepatch (scripts/art/build_pirate.py) are fitted to his head. The models are sized for the
+    /// game's cartoon eyes, <see cref="ModelEyeSpacing"/> apart (measured on Dafydd in game: 0.100 m); at runtime the distance between his eyeballs scales them, and the hat sits a
     /// number of eye spacings above and behind the point between his eyes (in his facing frame: right, up, forward).
     /// </summary>
     public static class PirateFit
     {
-        public const double ModelEyeSpacing = 0.066, MinScale = 0.6, MaxScale = 1.8;
+        public const double ModelEyeSpacing = 0.1, MinScale = 0.6, MaxScale = 1.8;
         /// <summary>The hat's origin (the crown's inner rim, centred) from the point between the eyes, in eye spacings.</summary>
-        public const double HatUp = 1.1, HatBack = 1.35;
+        public const double HatUp = 1.1, HatBack = 1.0;
         /// <summary>With no eyes found: the point between the eyes from the head bone, in metres (a guess at a human head).</summary>
         public const double EyesAboveHeadBone = 0.09, EyesBeforeHeadBone = 0.08;
+        /// <summary>The head bone's height above his feet before a fit is trusted (he is about 1.8 m tall).</summary>
+        public const double MinHeadHeight = 1.3;
 
         /// <summary>The models' scale for eyes this far apart: 1 for an unusable measurement, else clamped to a sane range.</summary>
         public static double Scale(double eyeSpacing)

@@ -18,7 +18,7 @@ namespace Melange.Smuggling
     {
         private const string HatResource = "MelangeSmuggling.tricorn.mesh.json", PatchResource = "MelangeSmuggling.eyepatch.mesh.json";
         private const string HatName = "MelangeSmuggling_Tricorn", PatchName = "MelangeSmuggling_Eyepatch";
-        private const int MaxTries = 30;
+        private const int MaxTries = 150;   // 2 s apart: five minutes for him to be drawn and standing
 
         private GameObject _hat, _patch;
         private int _tries;
@@ -31,13 +31,17 @@ namespace Melange.Smuggling
             if (!Settings.PirateLook) { Undress(npc); return; }
             if (_hat != null) _hidCowboy |= HideCowboyHat(npc, true);   // again each time: the game may re-apply his accessories
             if (_gaveUp || (_hat != null && _patch != null)) return;
+            // a culled avatar (far from the player or behind the camera) has its body switched off and an impostor drawn: its
+            // bones are not in the animated pose, so a fit then comes out turned (seen in game: the tricorn on its side)
+            var avatar = npc.GetComponentInChildren<Avatar>(true);
+            if (avatar != null && avatar.IsCulled) return;
             try
             {
                 if (TryFit(npc, out var fit)) Attach(npc, fit);
                 else if (++_tries >= MaxTries)
                 {
                     _gaveUp = true;
-                    Mod.Log.Warning("Dafydd's pirate look: no head to put it on; he keeps the cowboy hat");
+                    Mod.Log.Warning("Dafydd's pirate look: no standing head to put it on; he keeps the cowboy hat");
                 }
             }
             catch (Exception e)
@@ -74,6 +78,9 @@ namespace Melange.Smuggling
             if (head == null) return false;
             fit.Head = head;
             var root = avatar != null ? avatar.transform : npc.transform;
+            // the skeleton isn't always standing when he spawns (seen in game: his hat half a metre off the ground, in front
+            // of him), and a fit then is turned once he stands up; wait until his head is at a standing height
+            if (head.position.y - root.position.y < (float)PirateFit.MinHeadHeight) return false;
             Vector3 forward = Flat(root.forward);
             Eye left = null, right = null;
             try { left = avatar?.Eyes?.LeftEye; right = avatar?.Eyes?.RightEye; } catch { }
