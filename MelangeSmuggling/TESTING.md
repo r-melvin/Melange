@@ -5,7 +5,8 @@ P1 load and wiring (Oscar's Store `shop` hooked; threshold rolled 10-15 per save
 -32.5) on `StylizedWater2_Ocean` at y -6.5, quay top -2.5; model loaded, prompt on); `smuggling unlock` (Oscar's line,
 Dafydd's number); an order (#1: 440 units of weed, Standard or better, $73.06 a unit), accepted, sailed empty (NoShow,
 reputation 50 -> 40, next order 3 days on), and returned. Dafydd's tricorn and eyepatch were photographed on him (a
-fit is made only once he is drawn and standing). Loading real product, payment, imports and the route are not run yet.
+fit is made only once he is drawn and standing). A second run loaded real product: 20 OG Kush from the pockets went aboard ("20 of 520"), the boat sailed Short and
+paid $1,461 (20 x $73.06), reputation 50 -> 45. Imports and the route are not run yet.
 
 The pure logic (`Logic/`) is covered by `Melange.Tests/SmugglingTests.cs`
 (unlock roll and counting, order sizing and pricing, timing, payment, police risk with and without the route, imports,
