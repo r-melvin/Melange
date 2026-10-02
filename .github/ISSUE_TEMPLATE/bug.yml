@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in one of the mods does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please read [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) first. Reports without a log are closed.
+        Never attach a save or snapshot unless asked.
+  - type: dropdown
+    id: mod
+    attributes:
+      label: Which mod?
+      options:
+        - Paper Trail
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: The mod's version, the Schedule I version and branch, MelonLoader version, OS.
+      placeholder: "Paper Trail 0.3.0, Schedule I 0.4.7f7 (beta, IL2CPP), MelonLoader 0.7.3, Windows 11"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Attach `MelonLoader/Latest.log` from the session where it happened (drag the file in).
+    validations:
+      required: true
