@@ -23,6 +23,8 @@ namespace Melange.Smuggling
 
         public static bool Placed => _root != null;
         public static Vector3 Position => _berth;
+        /// <summary>The middle of the prompt's trigger box (the boat's interaction), or null before the boat is placed.</summary>
+        public static Vector3? PromptAt => _prompt != null ? _prompt.transform.position : (Vector3?)null;
 
         /// <summary>Leaving a save: the scene and everything in it are gone.</summary>
         public static void Forget()
@@ -30,6 +32,7 @@ namespace Melange.Smuggling
             if (_sailing != null) { MelonLoader.MelonCoroutines.Stop(_sailing); _sailing = null; }
             try { _interaction?.Dispose(); } catch { }
             _interaction = null; _root = _model = _prompt = null;
+            Pier.Forget();
         }
 
         /// <summary>Builds the boat at its berth (once per save), visible when <paramref name="moored"/>.</summary>
@@ -37,25 +40,40 @@ namespace Melange.Smuggling
         {
             if (_root != null) { Show(moored); return; }
             var m = Quay.Between(Settings.Berth);
-            float quayTop = GroundAt(m.StandX, m.StandZ) ?? -2.5f;
+            float quayTop = GroundAt(m.StandX, m.StandZ, out int groundLayer) ?? -2.5f;
             float water = Settings.Waterline ?? WaterAt(m.BoatX, m.BoatZ, quayTop) ?? quayTop - 1.8f;
             _berth = new Vector3(m.BoatX, water, m.BoatZ);
             _heading = Quaternion.Euler(0f, m.Yaw, 0f);
-            Mod.Log.Msg($"boat berth ({_berth.x:0.0}, {_berth.y:0.00}, {_berth.z:0.0}) heading {m.Yaw:0}, quay top {quayTop:0.00}, waterline from {(Settings.Waterline.HasValue ? "settings" : "the scene or a guess")}");
+
+            // the pier goes in first (its wall-face measurement must not see the boat), then the boat alongside its pontoon
+            PierLayout.Placement pier = Settings.PierEnabled ? Pier.Place(m, quayTop, water, groundLayer) : null;
+            if (pier != null) _berth = new Vector3(pier.BoatX, water, pier.BoatZ);
+            Mod.Log.Msg($"boat berth ({_berth.x:0.0}, {_berth.y:0.00}, {_berth.z:0.0}) heading {m.Yaw:0}, quay top {quayTop:0.00}, waterline from {(Settings.Waterline.HasValue ? "settings" : "the scene or a guess")}, " +
+                        $"{(pier != null ? "alongside the pier" : Settings.PierEnabled ? "no pier (it failed)" : "no pier (PierEnabled off)")}");
 
             _root = new GameObject(RootName);
             _root.transform.SetPositionAndRotation(_berth, _heading);
             _model = BuildModel(_root.transform);
 
-            // The prompt sits on the quay edge beside the boat, at the player's height: the game's interaction reach is
-            // 4 m, and the deck is below the quay. A trigger, so nobody bumps into it.
+            // The prompt: with the pier, over the boat's near gunwale beside the pontoon's outer strip, at chest height for
+            // someone standing on the pontoon (the game's interaction reach is 4 m). Without it, on the quay edge beside the
+            // boat at the player's height (the deck is below the quay). A trigger, so nobody bumps into it.
             _prompt = new GameObject("MelangeSmuggling_Hold");
             _prompt.transform.SetParent(_root.transform, false);
-            var standLocal = _root.transform.InverseTransformPoint(new Vector3(m.StandX, quayTop, m.StandZ));
-            _prompt.transform.localPosition = new Vector3(standLocal.x * 0.55f, quayTop - water + 1f, 0f);
             var box = _prompt.AddComponent<BoxCollider>();
             box.isTrigger = true;
-            box.size = new Vector3(1.2f, 2f, 5f);
+            if (pier != null)
+            {
+                var at = Pier.World(PierLayout.Outer + 0.55f, -PierLayout.Drop + 1.4f, 0f);
+                _prompt.transform.localPosition = _root.transform.InverseTransformPoint(at);
+                box.size = new Vector3(0.9f, 1.6f, 5f);              // the boat's x and the pier's x are parallel (either sign)
+            }
+            else
+            {
+                var standLocal = _root.transform.InverseTransformPoint(new Vector3(m.StandX, quayTop, m.StandZ));
+                _prompt.transform.localPosition = new Vector3(standLocal.x * 0.55f, quayTop - water + 1f, 0f);
+                box.size = new Vector3(1.2f, 2f, 5f);
+            }
             _prompt.layer = 0;                                     // Default: assumed to be in the interaction search mask (TESTING.md)
             try
             {
@@ -75,7 +93,9 @@ namespace Melange.Smuggling
             if (_root == null) return "not placed";
             var p = _root.transform.position;
             return $"berth ({_berth.x:0.0},{_berth.y:0.00},{_berth.z:0.0}), now at ({p.x:0.0},{p.y:0.00},{p.z:0.0}), shown {_root.activeSelf}, " +
-                   $"model {(Models.Has(Resource) ? "loaded" : "stand-in")}, prompt {(_interaction != null ? "on" : "off")}, sailing {_sailing != null}";
+                   $"model {(Models.Has(Resource) ? "loaded" : "stand-in")}, prompt {(_interaction != null ? "on" : "off")}" +
+                   (_prompt != null ? $" at ({_prompt.transform.position.x:0.0},{_prompt.transform.position.y:0.00},{_prompt.transform.position.z:0.0})" : "") +
+                   $", sailing {_sailing != null}";
         }
 
         public static void SetMessage(string text)
@@ -123,11 +143,25 @@ namespace Melange.Smuggling
 
         // ---- where the water is ----
 
-        private static float? GroundAt(float x, float z)
+        /// <summary>
+        /// The ground's height at (x, z), and the layer of the collider hit (Default when nothing is): the highest static
+        /// collider under the point, so a person or a car standing there (they have a rigidbody or a character controller)
+        /// doesn't count.
+        /// </summary>
+        private static float? GroundAt(float x, float z, out int layer)
         {
+            layer = 0;
             try
             {
-                if (Physics.Raycast(new Vector3(x, 30f, z), Vector3.down, out var hit, 60f, ~0, QueryTriggerInteraction.Ignore)) return hit.point.y;
+                var hits = Physics.RaycastAll(new Vector3(x, 30f, z), Vector3.down, 60f, ~0, QueryTriggerInteraction.Ignore);
+                float? best = null;
+                for (int i = 0; i < hits.Length; i++)
+                {
+                    var c = hits[i].collider;
+                    if (c == null || c.attachedRigidbody != null || c.GetComponent<CharacterController>() != null) continue;
+                    if (best == null || hits[i].point.y > best.Value) { best = hits[i].point.y; layer = c.gameObject.layer; }
+                }
+                return best;
             }
             catch { }
             return null;

@@ -6,7 +6,11 @@ P1 load and wiring (Oscar's Store `shop` hooked; threshold rolled 10-15 per save
 Dafydd's number); an order (#1: 440 units of weed, Standard or better, $73.06 a unit), accepted, sailed empty (NoShow,
 reputation 50 -> 40, next order 3 days on), and returned. Dafydd's tricorn and eyepatch were photographed on him (a
 fit is made only once he is drawn and standing). A second run loaded real product: 20 OG Kush from the pockets went aboard ("20 of 520"), the boat sailed Short and
-paid $1,461 (20 x $73.06), reputation 50 -> 45. Imports (after one paid run): offered acid, phosphorus and high-quality pseudo by
+paid $1,461 (20 x $73.06), reputation 50 -> 45. The pier (2026-10-02): built at (-68.6, -2.5, -33.2), yaw -31, the wall face measured 1.65 m out from the bollards,
+deck at y -6.15, 11 colliders on the quay's layer (Default), all three walkable ones live; the boat moved alongside to
+(-65.2, -6.5, -31.1). Photographed in game (stairs from a landing on the quay, the pontoon, the boat alongside). The
+player teleported onto the pontoon stands grounded on it, 1.3 m from the boat's prompt (reach 4 m), and onto the stair
+ramp stands grounded on it. Walking down by hand is not run. Imports (after one paid run): offered acid, phosphorus and high-quality pseudo by
 the crate; `import acid 1` took $637 up front, landed on the return and `collect` put 20 acid in the pockets. Police:
 with the street risk forced to 1 (test only) and the route unknown, the lot was seized ("Harbour police lifted that lot
 on the quay"); with the route known and walked, the same forced risk became 0 ("Came the old way, did you? Nobody saw a
@@ -42,7 +46,7 @@ list). Each logs `PROBE <what>: <result>`. Host only.
 | `smuggling risk <0..1\|off>` | TEST ONLY: forces the next delivery's street police risk (the route multiplier still applies, 0 by default); one delivery, then normal. Every delivery logs `delivery police roll: roll <r> vs risk <p> ..., route known <b>, via <b>, SEIZED\|passed`, and `smuggling load` appends it |
 | `smuggling route [known\|unknown\|walked]` | where the player is, whether that is on the route, seconds since, drove since, and whether a delivery now would count as via the route; `known` sets the route as known without the sewer spoke; TEST ONLY: `unknown` clears it, `walked` counts as just off the route on foot |
 | `smuggling tanker` | starts the experimental tanker job in 5 s (needs the setting and the methylamine item) |
-| `smuggling boat` | the berth, where the boat is now, whether it is shown, model or stand-in, prompt on or off |
+| `smuggling boat` | the berth, where the boat is now, whether it is shown, model or stand-in, prompt on or off and where its trigger's middle is; then `pier`: its position and yaw, the wall face (metres out from the bollards, and whether measured, from settings or the fallback), deck height, model or stand-in, how many colliders are live and on which layer, which of the three walkable ones (deck, landing, stair) exist, and what a ray straight down onto the pontoon and onto the stair hits (`pier deck`, `pier stair` when all is well); Dafydd's spot; and where you are, how far from the boat and from the prompt's middle |
 
 `probe-cmds.txt` runs unlock, an order, a load, a paid run, an import, a second run with the seizure check (route unknown vs known, forced risk 1) and the collection in one session.
 
@@ -57,7 +61,10 @@ The game's own console commands used below: `give <item> <qty>`, `settime <hhmm>
 - Log: `listening to <Oscar's shop name> (<code>) checkouts`; record the shop code.
 - Log: `boat berth (x, y, z) heading <deg>, quay top <y>, waterline from ...`, plus any `water candidate <name> at y <y>`
   lines. Record all of them: they settle where the water is (assumption A5).
-- No warnings starting `Oscar's shop wasn't found`, `boat model`, `boat prompt not added`, `Dafydd's look`,
+- Log: `pier at (x, y, z) yaw <deg>, wall face <m> m out from the bollards (measured|settings|fallback, measured <m>),
+  deck y <y>, <n> colliders on layer <l> (<name>), model loaded`, then the `boat berth` line ending `alongside the pier`.
+  Record the whole pier line (A19, A20).
+- No warnings starting `pier not built`, `pier model`, `the pier's pontoon floats`, `Oscar's shop wasn't found`, `boat model`, `boat prompt not added`, `Dafydd's look`,
   `Dafydd's dialogue`, `import <id>: no such item`, `Dafydd's pirate look`, `Dafydd's tricorn`, `Dafydd's eyepatch`.
 - Log, once he spawns: `Dafydd dressed: head bone '<name>', fitted to his eyes, eye spacing <s> m (scale <k>), tricorn on,
   eyepatch on; cowboy hat bounds centre (...), size (...), shader <name>`. Record the whole line (P4b uses it).
@@ -84,12 +91,36 @@ The game's own console commands used below: `give <item> <qty>`, `settime <hhmm>
   black eyepatch, long black curls, twirled moustache, white shirt, burgundy jacket, belt, dark trousers, boots, gold
   chain. No black cowboy hat. Record a screenshot; check nothing failed to load (bald, missing jacket) against the S1API
   log (assumption A9). P4b covers the hat and eyepatch in detail.
-- The boat lies in the water beside the quay, parallel to it, bow towards the next bollard (south-east). Record whether
-  it floats at the waterline, sits in the air or is sunk (A5), whether it is on the water side at all (A4), and whether
-  the colours render (pink means the material template failed: A6).
-- The prompt on the quay edge beside the boat reads `Turnip Night's boat (no order on)` (or `Somebody's speedboat`
-  before unlocking). Record the reach (A7).
+- The pier (P4c) stands against the quay wall; the boat lies alongside its pontoon, parallel to the quay, bow towards
+  the next bollard (south-east). Record whether it floats at the waterline, sits in the air or is sunk (A5), whether it
+  is on the water side at all (A4), and whether the colours render (pink means the material template failed: A6).
+- Dafydd stands on the quay by the head of the pier's stairs (not on the pontoon: A21).
+- The boat's prompt reads `Turnip Night's boat (no order on)` (or `Somebody's speedboat` before unlocking) from the
+  pontoon (P4c). With `PierEnabled` off it is on the quay edge beside the boat instead. Record the reach (A7).
 - After midnight and again at noon he is still there (his schedule walks him back).
+
+### P4c. The pier: walk down, stand on the pontoon, reach the prompt
+- Setup: P4, by day. `smuggling boat` first; record the whole line.
+- Expected in the probe: `pier at (...)`, `model loaded`, `colliders 11/11 live on layer <l> (<name>)`, `walkable 3/3 [deck,
+  landing, stair]`, `down onto the pontoon hits pier deck at y <deck y>`, `onto the stair hits pier stair at y <between the
+  quay top and the deck>`. Anything else there (`nothing`, or a scene object's name) means the colliders aren't where the
+  model is, or the ray hit something of the game's first: record it.
+- Look: the pontoon lies on the water against the quay wall, not floating in the air or sunk (deck about 0.35 m above
+  the water), and doesn't stand off the wall or into it (A19: set `QuayEdge`, metres out from the bollard line, and
+  report the value that fits). The stair runs down the wall face from a small landing on the quay top, with handrails
+  both sides. Screenshot it from the quay and from the pontoon.
+- Walk: from the quay onto the landing (from the land side, between its rails), down the stairs to the pontoon, along
+  it, and back up. Expected: no snagging on any step, no sliding back on the stair, no falling through the deck, the
+  stair or the landing; the handrails and the end rails stop you; the low invisible kerb along the boat side stops you
+  walking into the water (jumping over it is possible). Record any spot where you fall through or get stuck (A20), and
+  whether the walk felt like stairs (feet roughly on the treads) or a slide.
+- Prompt: on the pontoon's outer strip, facing the boat, the prompt shows from anywhere along the middle 5 m. `smuggling
+  boat` there reports `<d> m from the prompt's middle`: record it with whether the prompt showed. Use it once (the
+  status or load message must come up).
+- Sail and return (`smuggling sail` with an order on, or after P6): the boat leaves the pontoon outwards without passing
+  through it; the pier stays; the boat comes back alongside.
+- `PierEnabled = false`, reload: no pier, `no pier (PierEnabled off)`, the boat back against the quay wall where it was
+  photographed, the prompt on the quay edge, Dafydd back beside the boat's middle.
 
 ### P4b. The tricorn and eyepatch
 - Setup: P4. Walk round him close up, and watch him walk back to his spot (`settime 0000`) so the head moves.
@@ -235,6 +266,22 @@ The game's own console commands used below: `give <item> <qty>`, `settime <hhmm>
   "Cowboy"; its renderers are hidden but the accessory stays, so any hair blocking it does still applies. Materials are
   copies of the cowboy hat's own material (else a URP Lit material in the scene), flat-coloured with textures cleared; an
   avatar shader may not take `_BaseColor`/`_Color` the way URP Lit does.
+
+- **A19** The pier's wall face. The quay's ground is sampled every 10 cm outward from the bollard line at three points
+  along the berth (raycasts down from 2 m above the quay top, triggers ignored); the face is where the ground first
+  falls more than 1 m (or nothing is hit), the median of the three. It falls back to 1.2 m out (a guess from the photo
+  of the boat against the wall) when nothing believable (0.2-4 m) is found; `QuayEdge` overrides it. The stair and
+  pontoon are drawn for a 4 m drop from the quay top to the water (quay -2.5, water -6.5, as measured): with a
+  different `BoatWaterline` the pontoon stays at quay top - 3.65 and a warning is logged.
+- **A20** The colliders are plain BoxColliders (no rigidbody) on the layer of the collider the quay-top raycast hit at
+  Dafydd's old spot (people and vehicles skipped), so the player's controller should collide with them as with the
+  quay. The stair is one smooth ramp at 33 degrees through the middle of each 0.18 m riser (under a 35 degree slope
+  limit, if the controller has one), so a step-climbing controller never meets a step edge. Untested: the game's
+  player controller, its slope limit and step offset, and whether its ground check accepts that layer.
+- **A21** Dafydd stays on the quay, now by the stair head (`PierLayout.Stand`: 1.5 m inland of the bollard line,
+  abreast the landing). His schedule walks him on the game's baked navmesh, which can't include a runtime pier, so a
+  spot on the pontoon would be unreachable (or he'd be warped and snapped back to the quay). His spot is fixed before
+  the scene is measured, so it doesn't depend on A19.
 
 ## Not in this version
 

@@ -91,10 +91,16 @@ namespace Melange.Smuggling
             return label.StartsWith(prefix, StringComparison.Ordinal) && int.TryParse(label.Substring(prefix.Length), out id);
         }
 
+        /// <summary>
+        /// His spot on the quay: beside the boat, or with the pier at the head of its stairs. Not down on the pontoon: the
+        /// pier is a runtime object the game's baked navmesh doesn't cover, so his schedule (a navmesh walk, warping when it
+        /// can't) would put him back on the nearest navmesh, the quay, or fail.
+        /// </summary>
         internal static Vector3 StandPoint()
         {
             var m = Quay.Between(Settings.Berth);
-            return new Vector3(m.StandX, -2.5f, m.StandZ);   // the quay's height is about the Docks Warehouse's (-2.5)
+            var (x, z) = Settings.PierEnabled ? PierLayout.Stand(m) : (m.StandX, m.StandZ);
+            return new Vector3(x, -2.5f, z);                 // the quay's height is about the Docks Warehouse's (-2.5)
         }
 
         private static void Look(NPCPrefabBuilder.AvatarDefaultsBuilder av)

@@ -423,6 +423,174 @@ namespace Melange.Tests
             Assert.Equal(Quay.Between(3).BoatX, Quay.Between(99).BoatX);   // clamped to the last pair
         }
 
+        // ================================================================ the pier
+
+        [Fact]
+        public void ThePiersStairIsClimbable()
+        {
+            Assert.True(PierLayout.Riser <= 0.3f);                          // the player controller climbs ~0.3 m
+            Assert.True(PierLayout.SlopeDegrees < 35f);
+            Assert.True(PierLayout.SlopeDegrees > 25f);                     // and still looks like a stair, not a ramp
+            Assert.Equal(PierLayout.Drop, PierLayout.Risers * PierLayout.Riser, 4);
+            Assert.True(PierLayout.StairFoot < PierLayout.Length / 2f - 1f); // the stair lands on the pontoon with room to turn
+            Assert.True(PierLayout.StairHead >= -PierLayout.Length / 2f);   // and starts over it
+        }
+
+        [Fact]
+        public void TheRampRunsFromTheLandingToTheDeck()
+        {
+            var boxes = PierLayout.Boxes();
+            var stair = boxes.Single(b => b.Name == "stair");
+            var (top, bottom) = stair.TopLine();
+            Assert.Equal(PierLayout.StairHead, top.Z, 3);
+            Assert.Equal(-PierLayout.Riser / 2f, top.Y, 3);                // through the middle of each riser
+            float slope = (top.Y - bottom.Y) / (bottom.Z - top.Z);
+            Assert.Equal(PierLayout.Riser / PierLayout.Tread, slope, 3);
+            float zAtDeck = top.Z + (top.Y + PierLayout.Drop) / slope;
+            Assert.Equal(PierLayout.StairHead + (PierLayout.Risers - 0.5f) * PierLayout.Tread, zAtDeck, 3);
+            Assert.True(bottom.Y < -PierLayout.Drop);                       // it runs on into the deck, no lip
+            Assert.True(PierLayout.LandingTop - top.Y < 0.3f);              // a small step down from the landing onto it
+
+            var deck = boxes.Single(b => b.Name == "deck");
+            Assert.Equal(-PierLayout.Drop, deck.CY + deck.SY / 2f, 4);
+            var landing = boxes.Single(b => b.Name == "landing");
+            Assert.Equal(PierLayout.LandingTop, landing.CY + landing.SY / 2f, 4);
+            Assert.Equal(PierLayout.StairHead, landing.CZ + landing.SZ / 2f, 4);
+            Assert.Equal(3, boxes.Count(b => b.Walkable));
+        }
+
+        [Fact]
+        public void TheStairsHandrailsStandOnTheRampEitherSide()
+        {
+            var boxes = PierLayout.Boxes();
+            var stair = boxes.Single(b => b.Name == "stair");
+            foreach (var name in new[] { "rail_wall", "rail_open" })
+            {
+                var r = boxes.Single(b => b.Name == name);
+                Assert.Equal(stair.Pitch, r.Pitch, 4);
+                double a = r.Pitch * Math.PI / 180;
+                // the rail's bottom face centre lies on the ramp's top line
+                float bz = r.CZ - (float)(Math.Sin(a) * r.SY / 2), by = r.CY - (float)(Math.Cos(a) * r.SY / 2);
+                var (top, bottom) = stair.TopLine();
+                float onLine = top.Y + (bz - top.Z) * (bottom.Y - top.Y) / (bottom.Z - top.Z);
+                Assert.Equal(onLine, by, 3);
+                Assert.Equal(PierLayout.RailHeight, r.SY, 4);
+            }
+            Assert.True(boxes.Single(b => b.Name == "rail_wall").CX < stair.CX - stair.SX / 2f + 0.01f);
+            Assert.True(boxes.Single(b => b.Name == "rail_open").CX > stair.CX + stair.SX / 2f - 0.01f);
+        }
+
+        [Fact]
+        public void TheBoatLiesAlongsideThePontoon()
+        {
+            Assert.True(PierLayout.BoatOut - PierLayout.BoatHalfBeam >= PierLayout.Outer + 0.1f);   // room for the fenders
+            Assert.True(PierLayout.BoatOut - PierLayout.BoatHalfBeam <= PierLayout.Outer + 0.5f);   // but close enough to step to
+            var m = Quay.Default;
+            var p = PierLayout.Place(m, 1.2f, -2.5f, -6.5f);
+            // the pier's origin is on the wall face, out along the basin's normal from the bollards' midpoint
+            Assert.Equal(m.MidX + m.OutX * 1.2f, p.X, 4);
+            Assert.Equal(m.MidZ + m.OutZ * 1.2f, p.Z, 4);
+            Assert.Equal(-2.5f, p.Y, 4);
+            Assert.Equal(-2.5f - PierLayout.Drop, p.DeckY, 4);
+            Assert.Equal(-6.5f + PierLayout.Freeboard, p.DeckY, 2);     // the measured quay and water: the pontoon floats right
+            // the boat, further out on the same normal, at the waterline, heading unchanged
+            Assert.Equal(1.2f + PierLayout.BoatOut, Quay.Distance(p.BoatX, 0, p.BoatZ, m.MidX, 0, m.MidZ), 3);
+            Assert.True(p.BoatX > p.X);
+            Assert.Equal(-6.5f, p.BoatY);
+            Assert.Equal(m.Yaw, p.BoatYaw);
+        }
+
+        [Fact]
+        public void ThePiersFrameFacesTheBasinAtEveryBerth()
+        {
+            for (int i = 0; i < Quay.Bollards.Length - 1; i++)
+            {
+                var m = Quay.Between(i);
+                var p = PierLayout.Place(m, 1f, -2.5f, -6.5f);
+                double yaw = p.Yaw * Math.PI / 180;
+                // Unity: a yaw turns +z to (sin, cos) and +x to (cos, -sin); +x must be the basin's normal
+                Assert.Equal(Math.Sin(yaw), p.ForwardX, 4);
+                Assert.Equal(Math.Cos(yaw), p.ForwardZ, 4);
+                Assert.Equal(Math.Cos(yaw), m.OutX, 4);
+                Assert.Equal(-Math.Sin(yaw), m.OutZ, 4);
+                Assert.True(m.OutX > 0f);
+                // along the quay either way
+                Assert.Equal(1f, Math.Abs(p.ForwardX * m.AlongX + p.ForwardZ * m.AlongZ), 4);
+                var far = p.World(PierLayout.Outer, 0f, 0f);
+                Assert.True(far.X > p.X);
+            }
+        }
+
+        [Fact]
+        public void DafyddWaitsOnTheQuayByTheStairHead()
+        {
+            var m = Quay.Default;
+            var (x, z) = PierLayout.Stand(m);
+            float inland = (x - m.MidX) * m.OutX + (z - m.MidZ) * m.OutZ;
+            Assert.True(inland < -1f);                                     // on the land side of the bollards
+            var p = PierLayout.Place(m, 1.2f, -2.5f, -6.5f);
+            float along = (x - p.X) * p.ForwardX + (z - p.Z) * p.ForwardZ;
+            Assert.Equal(PierLayout.StairHead - 0.5f, along, 3);           // abreast the landing
+            var landing = p.World(PierLayout.LandingIn, 0f, PierLayout.StairHead - 0.5f);
+            Assert.True(Quay.Distance(x, 0, z, landing.X, 0, landing.Z) < 3f);
+            // clear of the bollards
+            foreach (var b in Quay.Bollards) Assert.True(Quay.Distance(x, 0, z, b.X, 0, b.Z) > 1f);
+        }
+
+        [Theory]
+        [InlineData(new[] { -2.5f, -2.5f, -2.5f, -6.5f, -6.5f }, 0.25f)]          // quay, quay, quay, water
+        [InlineData(new[] { -2.5f, -2.45f, -2.9f, -3.2f, -9f }, 0.35f)]          // a sloping capping counts as quay until it falls 1 m
+        [InlineData(new[] { -2.5f, -2.5f, float.NaN, -6.5f }, 0.15f)]            // nothing hit: off the quay
+        public void TheWallFaceIsWhereTheGroundFallsAway(float[] heights, float edge)
+        {
+            var hs = heights.Select(h => float.IsNaN(h) ? (float?)null : h).ToList();
+            Assert.Equal(edge, PierLayout.EdgeFromProfile(hs, 0.1f, -2.5f).Value, 4);
+        }
+
+        [Fact]
+        public void TheWallFaceIsUnknownWithoutADrop()
+        {
+            Assert.Null(PierLayout.EdgeFromProfile(new float?[] { -6.5f, -6.5f }, 0.1f, -2.5f));    // starts in the water
+            Assert.Null(PierLayout.EdgeFromProfile(new float?[] { -2.5f, -2.5f }, 0.1f, -2.5f));    // never falls away
+            Assert.Null(PierLayout.EdgeFromProfile(new float?[0], 0.1f, -2.5f));
+            Assert.Equal(0.8f, PierLayout.Edge(0.8f, 2f));                                          // settings first
+            Assert.Equal(2f, PierLayout.Edge(null, 2f));
+            Assert.Equal(PierLayout.FallbackEdge, PierLayout.Edge(null, 9f));                       // not believable
+            Assert.Equal(PierLayout.FallbackEdge, PierLayout.Edge(null, null));
+            Assert.Equal(PierLayout.FallbackEdge, PierLayout.Edge(-1f, null));
+        }
+
+        [Fact]
+        public void ThePierModelMatchesTheLayout()
+        {
+            // the embedded model (scripts/art/build_pier.py) and the colliders share PierLayout's numbers
+            string dir = AppContext.BaseDirectory, path = null;
+            while (dir != null && path == null)
+            {
+                string p = System.IO.Path.Combine(dir, "MelangeSmuggling", "Art", "pier.mesh.json");
+                if (System.IO.File.Exists(p)) path = p; else dir = System.IO.Path.GetDirectoryName(dir);
+            }
+            Assert.NotNull(path);
+            using var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(path));
+            float minX = float.MaxValue, minZ = float.MaxValue;
+            bool deckTop = false, landingTop = false;
+            foreach (var part in doc.RootElement.GetProperty("parts").EnumerateArray())
+            {
+                var v = part.GetProperty("v").EnumerateArray().Select(e => e.GetSingle()).ToArray();
+                Assert.Equal(0, part.GetProperty("t").GetArrayLength() % 3);
+                for (int i = 0; i < v.Length; i += 3)
+                {
+                    minX = Math.Min(minX, v[i]); minZ = Math.Min(minZ, v[i + 2]);
+                    if (Math.Abs(v[i + 1] + PierLayout.Drop) < 0.001f && v[i] > PierLayout.WallGap + PierLayout.StairWidth) deckTop = true;
+                    if (Math.Abs(v[i + 1] - PierLayout.LandingTop) < 0.001f && v[i] < 0f) landingTop = true;
+                }
+            }
+            Assert.Equal(PierLayout.LandingIn, minX, 3);
+            Assert.Equal(PierLayout.StairHead - PierLayout.LandingDepth, minZ, 2);
+            Assert.True(deckTop);
+            Assert.True(landingTop);
+        }
+
         [Theory]
         [InlineData(-34.5f, -5f, -10.7f, true)]     // the canal mouth
         [InlineData(26f, -4f, 11f, true)]           // the canal pipe

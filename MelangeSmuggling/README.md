@@ -15,8 +15,9 @@ night whether you've delivered or not, and brings goods back on the return leg.
 - **Orders.** The morning after, Dafydd texts an order: a lot of one drug you already make, at a quality floor
   (Standard, later sometimes Premium), at about 20% over market value per unit. Orders grow with your rank and with how
   reliably you've filled his boat. Answer **Aye** or **Not this time**.
-- **Delivery.** The boat is moored on the east side of the Docks quay, Dafydd beside it. Bring the product and use the
-  boat (or ask Dafydd to load the hold): matching product comes out of your pockets, and out of the trunk of the car you
+- **Delivery.** The boat is moored on the east side of the Docks quay, alongside a timber pontoon with stairs down the
+  quay wall; Dafydd waits at the top of the stairs. Bring the product and use the boat from the pontoon (or ask Dafydd to
+  load the hold): matching product comes out of your pockets, and out of the trunk of the car you
   drove there if it's parked close by. Every delivery has a **police risk**, shown before you load: bigger loads and
   the curfew raise it, and a seized delivery is lost.
 - **Sailing.** At **02:00** after the deadline day the boat sails, with or without your product. You're paid by bank
@@ -35,7 +36,9 @@ night whether you've delivered or not, and brings goods back on the return leg.
 In `UserData/MelonPreferences.cfg`, section `MelangeSmuggling`: the purchase range and the $300 floor, order, departure
 and return times, days of grace before the deadline, days between orders, the price premium, police risk (and the
 route's multiplier), the import catalogue (`id:crate:price`), the methylamine item, which gap between the quay's
-bollards the boat uses, and the boat's waterline if it sits wrong. `PirateLook` (off: Dafydd wears a black cowboy hat
+bollards the boat uses, and the boat's waterline if it sits wrong. `PierEnabled` (on: the pontoon and stairs; off: the boat
+lies against the quay wall and is used from the quay edge) and `QuayEdge` (where the quay wall is, if the pier stands off
+it or into it). `PirateLook` (off: Dafydd wears a black cowboy hat
 instead of the tricorn and eyepatch), and `PirateHatScale`, `PirateHatOffset`, `PirateEyepatchOffset` to nudge them if
 they sit wrong on his head. Changes apply from the next load. In co-op the
 host's settings and the host's game decide everything; other players see the boat and Dafydd and get his texts.

@@ -444,7 +444,13 @@ namespace Melange.Smuggling
                 case "tanker":
                     return Tanker.Force(s);
                 case "boat":
-                    return Boat.Describe();
+                {
+                    var player = Il2CppScheduleOne.PlayerScripts.Player.Local;
+                    string you = player == null ? "" : $"; you at ({player.transform.position.x:0.0},{player.transform.position.y:0.00},{player.transform.position.z:0.0}), " +
+                                                   $"{UnityEngine.Vector3.Distance(player.transform.position, Boat.Position):0.0} m from the boat" +
+                                                   (Boat.PromptAt.HasValue ? $", {UnityEngine.Vector3.Distance(player.transform.position, Boat.PromptAt.Value):0.0} m from the prompt's middle (reach 4 m)" : "");
+                    return $"{Boat.Describe()}; pier {Pier.Describe()}; Dafydd's spot ({Dafydd.StandPoint().x:0.0},{Dafydd.StandPoint().z:0.0}){you}";
+                }
                 default:
                     return "unknown; try " + ProbeUsage;
             }

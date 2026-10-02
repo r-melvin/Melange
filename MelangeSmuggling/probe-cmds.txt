@@ -6,6 +6,8 @@
 # "route unknown", "route walked" and "risk" are TEST ONLY: they exist for this script and change nothing in normal play.
 
 smuggling status
+# The pier and the boat: positions, the pier's colliders and what a ray down onto the pontoon and the stair hits
+smuggling boat
 changecash 5000
 wait 1
 

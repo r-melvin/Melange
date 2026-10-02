@@ -16,7 +16,8 @@ namespace Melange.Smuggling
         private static MelonPreferences_Entry<float> _methPrice;
         private static MelonPreferences_Entry<bool> _tanker;
         private static MelonPreferences_Entry<string> _tankerVehicle;
-        private static MelonPreferences_Entry<bool> _pirate;
+        private static MelonPreferences_Entry<bool> _pirate, _pier;
+        private static MelonPreferences_Entry<float> _quayEdge;
         private static MelonPreferences_Entry<float> _hatScale;
         private static MelonPreferences_Entry<string> _hatOffset, _patchOffset;
 
@@ -41,6 +42,8 @@ namespace Melange.Smuggling
             _methPrice = c.CreateEntry("MethylaminePrice", 60f, "Imports: methylamine price per item");
             _berth = c.CreateEntry("Berth", 2, "Which gap between the quay's bollards the boat moors in (0-3)");
             _boatY = c.CreateEntry("BoatWaterline", -999f, "Boat waterline height (world y)", "-999 = find the water automatically.");
+            _pier = c.CreateEntry("PierEnabled", true, "A pontoon and stairs down to the boat", "Off: no pier; the boat lies against the quay wall and its prompt is on the quay edge.");
+            _quayEdge = c.CreateEntry("QuayEdge", -999f, "Pier: the quay wall face, metres out from the bollard line", "-999 = measure it in the scene. Set it if the pier stands off the wall or into it.");
             _tanker = c.CreateEntry("TankerJob", false, "Experimental: the methylamine tanker job", "Off by default and unproven in game. Needs MethylamineItemId.");
             _tankerVehicle = c.CreateEntry("TankerVehicle", "veeper", "Experimental: the tanker's vehicle code");
             _tankerUnits = c.CreateEntry("TankerMethylamine", 40, "Experimental: methylamine in a stopped tanker");
@@ -76,6 +79,9 @@ namespace Melange.Smuggling
         public static int Berth => _berth?.Value ?? 2;
         /// <summary>The configured waterline, or null to find the water.</summary>
         public static float? Waterline => _boatY == null || _boatY.Value <= -900f ? (float?)null : _boatY.Value;
+        public static bool PierEnabled => _pier?.Value ?? true;
+        /// <summary>The configured wall face (metres out from the bollard line), or null to measure it.</summary>
+        public static float? QuayEdge => _quayEdge == null || _quayEdge.Value <= -900f ? (float?)null : _quayEdge.Value;
         public static bool Tanker => _tanker?.Value ?? false;
         public static string TankerVehicle => string.IsNullOrWhiteSpace(_tankerVehicle?.Value) ? "veeper" : _tankerVehicle.Value.Trim();
         public static int TankerMethylamine => _tankerUnits?.Value ?? 40;

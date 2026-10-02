@@ -24,6 +24,8 @@ Run any of them headless:
 | blotter_frame | build_ergot.py | psychedelics | 2 x 1 | 0.66 x 1.54 x 0.49 | 352 | bottom centre, floor |
 | tricorn | build_pirate.py | smuggling | n/a (NPC head) | 0.41 x 0.15 x 0.40 | 1468 | centre of the crown opening (the hat's inner rim) |
 | eyepatch | build_pirate.py | smuggling | n/a (NPC head) | 0.20 x 0.07 x 0.22 | 512 | bridge of the nose at eye height, on the face surface |
+| speedboat | build_speedboat.py | smuggling | n/a (moored at the Docks) | 2.30 x 3.06 x 7.55 | 1474 | on the waterline, midships, on the centre line |
+| pier | build_pier.py | smuggling | n/a (at the Docks quay) | 3.48 x 8.08 x 10.23 | 2448 | the quay's wall face at quay-top height, abreast the pontoon's middle (see below) |
 
 ## Attachment points (Unity axes, metres from the model's origin)
 
@@ -41,6 +43,14 @@ Run any of them headless:
   left eye, front face at z = +0.009); the mod scales both by the wearer's real eye spacing. The eyepatch strap is
   snapped to a 0.19 x 0.23 x 0.21 m ellipsoid head centred 0.095 m behind the origin, so on a differently shaped head it
   may float or clip. The tricorn's gold braid is `metal`.
+- **pier** (all numbers are `MelangeSmuggling/Logic/PierLayout.cs`'s, which the game's colliders use; change both together):
+  +X out into the basin from the wall face, +Z along the quay, the stair's head at -Z. Pontoon x 0.1..2.6, z -4.5..4.5, deck
+  top y -3.65 (0.35 m above water at y -4.0, i.e. a 4 m quay). Stair x 0.1..1.1 against the wall, 20 risers of 0.1825 m on
+  0.28 m treads (33 degrees), head at z -4.2, foot on the deck at z 1.4. Landing on the quay top x -0.6..1.1, z -5.2..-4.2,
+  top y 0.03. Handrails 1 m. Cleats at (2.4, -3.65, +-2.8), timber bollards at (2.3, -3.65, +-3.9); the boat's centre line
+  is x 4.0 (0.25 m of fenders off the pontoon). Guide piles stand 0.6 m above the quay top just off the pontoon's ends.
+  `out/pier.png` shows it from the basin with the speedboat alongside, `out/pier_stair.png` from the pontoon's far end; the
+  quay, water and boat in the renders are not exported.
 - **terrarium**: the sand top (where toads sit) is 0.83 m up; interior about 0.86 x 0.41 m.
 
 ## Notes

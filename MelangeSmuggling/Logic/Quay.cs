@@ -21,6 +21,8 @@ namespace Melange.Smuggling
         {
             public float BoatX, BoatZ, Yaw;
             public float StandX, StandZ;
+            /// <summary>The midpoint between the two bollards, the unit vector along the quay (towards the next bollard) and the basin's normal.</summary>
+            public float MidX, MidZ, AlongX, AlongZ, OutX, OutZ;
         }
 
         /// <summary>
@@ -45,6 +47,7 @@ namespace Melange.Smuggling
                 Yaw = (float)(Math.Atan2(dx, dz) * 180.0 / Math.PI),
                 StandX = mx - nx * ashore,
                 StandZ = mz - nz * ashore,
+                MidX = mx, MidZ = mz, AlongX = dx, AlongZ = dz, OutX = nx, OutZ = nz,
             };
         }
 
