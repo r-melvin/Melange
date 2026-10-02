@@ -13,8 +13,15 @@ confiscated; unseen catches go to the pockets; a terrarium placed in the motel r
 milks 2 venom (then nothing until they recover), feeds over two nights (crickets 5 -> 3 -> 1, breeding 0 -> 1 -> 2);
 Ana's unlock opens the LSD recipe; a blotter frame with 3 blank sheets and 2 solutions doses 2 sheets of Sunburst
 (rolls 0.249 and 0.142 against 0.100: good); trip outcomes move the design's reputation. A full pocket (8 slots) refuses
-a catch or a purchase with a notification and takes no cash. Not run yet: breeding to a birth, toads turning to dust,
-selling to customers, painting, ergot growing, the sewer toads. Everything past
+a catch or a purchase with a notification and takes no cash. Day cycles (`terra days`, `terra cycle`): two wild toads
+fed and milked daily bred a toad every 3 days up to the tank's 6, the two wild ones turned to dust after their 10th
+milking (day 31: "3 to dust"), unfed nights count as hungry; ergot planted in a mushroom bed through the patched
+`CreateAndAssignColony` (`ergot colony in bed <guid>`), saved spawn ID `melange_psy_ergot_spawn`, grown and harvested as
+16 `melange_psy_ergot`; a dose rolled a bad sheet (0.096 vs 0.100); LSD given to a real customer (Mrs. Ming) through the
+game's consumption path fires the trip (`trip: Mrs. Ming, batch 1 (good, Standard), design preset:sunburst rep 1`) and
+raises the design's reputation (2 good after two sales; her relationship was already at the 5.00 cap). Not run yet: a
+paid sale through the handover screen, painting, the sewer toads. Note: venom from many milkings fills the pockets (three
+quality stacks). Everything past
 loading (catching, the terrarium, the stall's prompts, dosing, painting) is not run yet.
 
 The pure logic (`Logic/`: husbandry, venom quality, lifespan, the pond's windows

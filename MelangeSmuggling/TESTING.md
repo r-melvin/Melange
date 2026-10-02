@@ -6,7 +6,11 @@ P1 load and wiring (Oscar's Store `shop` hooked; threshold rolled 10-15 per save
 Dafydd's number); an order (#1: 440 units of weed, Standard or better, $73.06 a unit), accepted, sailed empty (NoShow,
 reputation 50 -> 40, next order 3 days on), and returned. Dafydd's tricorn and eyepatch were photographed on him (a
 fit is made only once he is drawn and standing). A second run loaded real product: 20 OG Kush from the pockets went aboard ("20 of 520"), the boat sailed Short and
-paid $1,461 (20 x $73.06), reputation 50 -> 45. Imports and the route are not run yet.
+paid $1,461 (20 x $73.06), reputation 50 -> 45. Imports (after one paid run): offered acid, phosphorus and high-quality pseudo by
+the crate; `import acid 1` took $637 up front, landed on the return and `collect` put 20 acid in the pockets. Police:
+with the street risk forced to 1 (test only) and the route unknown, the lot was seized ("Harbour police lifted that lot
+on the quay"); with the route known and walked, the same forced risk became 0 ("Came the old way, did you? Nobody saw a
+thing."). Orders draw a random discovered drug (weed, meth, shrooms seen), so a script should carry each.
 
 The pure logic (`Logic/`) is covered by `Melange.Tests/SmugglingTests.cs`
 (unlock roll and counting, order sizing and pricing, timing, payment, police risk with and without the route, imports,
