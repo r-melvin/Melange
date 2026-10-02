@@ -14,8 +14,8 @@ namespace Melange.Psychedelics
     /// bad-batch roll, recorded in the batch ledger so the customers' trips can be put down to its design. Host only.
     /// </summary>
     /// <remarks>
-    /// Designs are the built-in ones for now. Painting your own with the spray can on the frame (the game's SpraySurface,
-    /// saved as strokes and reused) is the next step and needs an in-game spike first: see TESTING.md, "Painted designs".
+    /// Five built-in designs, plus, with the experimental "PaintDesigns" setting, designs the player sprays onto the frame's
+    /// sheet with the game's own spray canvas (Painting; SPRAY-SPIKE.md). Untested in game: TESTING.md, "Painted designs".
     /// </remarks>
     internal static class Frames
     {
@@ -25,15 +25,17 @@ namespace Melange.Psychedelics
 
         private sealed class Dressing
         {
-            public GameObject Anchor;
+            public GameObject Anchor, Sheet;
             public InteractionPrompt Dose, Design;
-            public bool Failed;
+            public bool Failed, Modelled;
+            public Painting.Canvas Canvas;
         }
 
         // the model's numbers (scripts/art/MODELS.md): the sheet's centre and size, leaning back 8 degrees
         private static readonly Vector3 SheetCentre = new Vector3(0f, 0.956f, 0.105f), SheetSize = new Vector3(0.6f, 0.4f, 0.08f);
+        private static readonly Quaternion SheetTilt = Quaternion.Euler(-8f, 0f, 0f);
 
-        public static void Reset() { _dressed.Clear(); _next = 0f; }
+        public static void Reset() { _dressed.Clear(); _next = 0f; Painting.Reset(); }
 
         private static MelangePsychedelicsData Data => MelangePsychedelicsData.Current;
 
@@ -51,7 +53,16 @@ namespace Melange.Psychedelics
                     var s = Placed.Storage(b);
                     var design = DesignOf(Placed.Guid(b));
                     int sheets = s == null ? 0 : Math.Min(Placed.Count(s, Ids.BlankSheet), Placed.Count(s, Ids.LsdSolution));
-                    d.Design?.SetMessage(design == null ? "Choose a design" : $"Design: {design.Name} ({Describe(design)})");
+                    bool paintable = false;
+                    if (Settings.PaintDesigns && d.Modelled)
+                    {
+                        design = Paint(d, Placed.Guid(b), design);
+                        paintable = Painting.Paintable(d.Canvas);
+                        // the frame's dose prompt sits in front of the canvas: out of the way while a spray can could paint it
+                        bool showDose = !(paintable && Painting.SprayCanInHand());
+                        if (d.Sheet != null && d.Sheet.activeSelf != showDose) d.Sheet.SetActive(showDose);
+                    }
+                    d.Design?.SetMessage(design == null ? "Choose a design" : $"Design: {design.Name} ({Describe(design)})" + (paintable ? ", or spray your own on the sheet" : ""));
                     d.Dose?.SetMessage(sheets == 0 ? "Dose sheets (needs blank sheets and solution)" : $"Dose {sheets} sheet(s)");
                 }
             }
@@ -67,10 +78,13 @@ namespace Melange.Psychedelics
             {
                 var s = Placed.Storage(b);
                 if (s != null) Placed.Filter(s, Ids.BlankSheet, Ids.LsdSolution, Ids.LsdProduct);
-                d.Anchor = Placed.Dress(b, "blotter_frame", out _) ?? b.gameObject;
+                var model = Placed.Dress(b, "blotter_frame", out _);
+                d.Modelled = model != null;
+                d.Anchor = model ?? b.gameObject;
                 string guid = Placed.Guid(b);
                 var sheet = Placed.Target(d.Anchor, "Melange dose", SheetCentre, SheetSize);
-                sheet.transform.localRotation = Quaternion.Euler(-8f, 0f, 0f);
+                sheet.transform.localRotation = SheetTilt;
+                d.Sheet = sheet;
                 d.Dose = InteractionPrompt.CreateBuilder(sheet).WithMessage("Dose sheets").WithRange(3f).WithPriority(5)
                     .OnInteractionStarted(() => Dose(b, guid)).Build();
                 var foot = Placed.Target(d.Anchor, "Melange design", new Vector3(0f, 0.2f, 0f), new Vector3(0.6f, 0.35f, 0.45f));
@@ -79,6 +93,29 @@ namespace Melange.Psychedelics
             }
             catch (Exception e) { d.Failed = true; Mod.Log.Warning("blotter frame look/prompts: " + e.Message); }
             return d;
+        }
+
+        /// <summary>
+        /// The frame's spray canvas (made on first need): kept showing the frame's design, and a finished painting made the
+        /// frame's design. Returns the frame's design after that.
+        /// </summary>
+        private static Design Paint(Dressing d, string guid, Design design)
+        {
+            try
+            {
+                d.Canvas ??= Painting.Create(d.Anchor, SheetCentre, SheetTilt, SheetSize.x);
+                var painted = Painting.Sync(d.Canvas, design, Data.Designs);
+                if (painted == null) return design;
+                Data.FrameDesigns[guid] = painted.Id;
+                Items.Notify("New design", $"{painted.Name}: dose sheets to print it.");
+                return painted;
+            }
+            catch (Exception e)
+            {
+                Mod.Log.Warning("spray canvas: " + e.Message);
+                if (d.Canvas != null) d.Canvas.Failed = true;
+                return design;
+            }
         }
 
         private static string Describe(Design d)

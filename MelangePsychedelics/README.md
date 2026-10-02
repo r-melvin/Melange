@@ -9,9 +9,9 @@ yet; see `TESTING.md`.
 ## Toad
 
 1. **Get toads.**
-   - **The pond**, most evenings for a few hours. You need a **toad net** (Randy sells them). A **wildlife officer** walks
-     round the pond while the toads are out: get caught taking one and he fines you and takes the toad, and the third
-     time in a night he calls the police.
+   - **The pond**, most evenings for a few hours. You need a **toad net** (Randy sells them). A **wildlife officer**, Clive
+     Mossop in his ranger's khaki, walks round the pond while the toads are out: take one where he can see you (near
+     him) and he fines you and takes the toad, and the third time in a night he calls the police. Wait for him to pass.
    - **The sewer**, once you can get in. If you spared the Sewer King he shows you his spot (more toads, and he teaches
      you to keep them better); otherwise there's the odd one by the mushrooms.
    - **Randy's**, round the back of Randy's Bait & Tackle at the Docks, at night for a couple of hours (10 pm to midnight
@@ -43,7 +43,8 @@ yet; see `TESTING.md`.
 
 In `UserData/MelonPreferences.cfg`, section `MelangePsychedelics`: milkings before a toad turns to dust, toads per tank,
 breeding and starving days, Randy's night hours and markup, the bad-batch odds, the spores' rank, and switches for the
-pond, the sewer toads, Randy's stall and ergot growing (off: Phil sells ergot ready to use). In co-op the host's settings
+pond, the sewer toads, Randy's stall and ergot growing (off: Phil sells ergot ready to use), and `PaintDesigns`
+(experimental, off by default: spray your own design onto a frame's sheet with a spray can). In co-op the host's settings
 decide.
 
 ## Co-op
@@ -55,7 +56,8 @@ designs. Catching toads and buying from Randy work for everyone.
 
 - The toad, crickets, sheets and the like borrow other items' looks for now; the terrarium, the toads in it and the
   blotter frame have their own models.
-- Designs are five built-in ones; painting your own with the spray can is planned.
+- Designs are five built-in ones. Painting your own with the spray can is built but untested in game, so it is behind
+  the `PaintDesigns` setting (off by default; host only). Painted designs don't change the look of the LSD item.
 - Brands follow your sheets in the order you made them, so selling an older batch after a newer one of the same quality
   can credit the wrong design.
 - Removing the mod: Toad and LSD items, terrariums, frames and ergot disappear from the save.

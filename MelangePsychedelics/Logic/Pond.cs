@@ -89,11 +89,14 @@ namespace Melange.Psychedelics
 
     /// <summary>
     /// The wildlife officer's round while the toads are out: he walks the ring of spots, one lap per <see cref="LapMinutes"/>,
-    /// and sees the spot he is at and its neighbours. Catching a toad on a spot he can see is an offence.
+    /// and sees the spot he is at and its neighbours. Catching a toad on a spot he can see is an offence. When he is in the
+    /// world (an NPC walking the ring), the spot he is at is the one nearest his real position; the clock is the fallback.
     /// </summary>
     public static class WildlifeOfficer
     {
         public const int LapMinutes = 40, Sight = 1;
+        /// <summary>Metres beyond the pond's edge within which the NPC counts as on his round (further, he's lost or stuck).</summary>
+        public const double RoundReach = 15.0;
 
         /// <summary>The spot index he is at, minutes into the window.</summary>
         public static int At(int minutesInto, int spotCount)
@@ -103,14 +106,39 @@ namespace Melange.Psychedelics
             return Math.Min(spotCount - 1, m * spotCount / LapMinutes);
         }
 
-        public static bool Sees(int spot, int minutesInto, int spotCount)
+        /// <summary>The spot he walks towards, minutes into the window: the one after the spot the clock puts him at.</summary>
+        public static int Heading(int minutesInto, int spotCount)
         {
             int at = At(minutesInto, spotCount);
-            if (at < 0) return false;
-            int d = Math.Abs(spot - at);
+            return at < 0 ? -1 : (at + 1) % spotCount;
+        }
+
+        public static bool Sees(int spot, int minutesInto, int spotCount) => SeesFrom(spot, At(minutesInto, spotCount), spotCount);
+
+        /// <summary>Whether he sees <paramref name="spot"/> standing at <paramref name="officerSpot"/> (his spot and its neighbours).</summary>
+        public static bool SeesFrom(int spot, int officerSpot, int spotCount)
+        {
+            if (spotCount <= 0 || officerSpot < 0 || officerSpot >= spotCount || spot < 0 || spot >= spotCount) return false;
+            int d = Math.Abs(spot - officerSpot);
             d = Math.Min(d, spotCount - d);                 // the spots are a ring round the pond
             return d <= Sight;
         }
+
+        /// <summary>
+        /// The spot nearest a point given as its offset from the pond's centre (dx east, dz north, the world's x and z). Spot i
+        /// is at angle i * 360 / count from +x towards +z, as the ring is laid out. -1 for no spots or a point on the centre.
+        /// </summary>
+        public static int SpotNearest(double dx, double dz, int spotCount)
+        {
+            if (spotCount <= 0 || (Math.Abs(dx) < 1e-9 && Math.Abs(dz) < 1e-9)) return -1;
+            double a = Math.Atan2(dz, dx);
+            if (a < 0) a += 2 * Math.PI;
+            int i = (int)Math.Round(a / (2 * Math.PI / spotCount));
+            return i % spotCount;
+        }
+
+        /// <summary>Whether a walker this far from the pond's centre is on his round (near enough the ring to see it).</summary>
+        public static bool OnRound(double distanceFromCentre, double pondRadius) => distanceFromCentre <= Math.Max(0.0, pondRadius) + RoundReach;
     }
 
     /// <summary>What getting caught costs: a fine that grows with each offence that night, and a police look-in from the third.</summary>

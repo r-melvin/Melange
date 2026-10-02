@@ -34,6 +34,8 @@ namespace Melange.Psychedelics
 
         // the LSD chemist (S1API supplier NPC): her ID is save data, never rename it
         public const string AnaNpc = "melange_psy_ana_slughin";
+        // the wildlife officer at the pond (S1API NPC): save data too, never rename it
+        public const string WardenNpc = "melange_psy_wildlife_warden";
 
         /// <summary>Tabs on one sheet: the game's brick holds 20 units (BrickPress consumes 20 of a product).</summary>
         public const int TabsPerSheet = 20;

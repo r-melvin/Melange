@@ -11,6 +11,10 @@
   <ItemGroup>
     <Reference Include="S1API.Il2Cpp.MelonLoader"><HintPath>$(S1ApiDll)</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(Interop)/UnityEngine.PhysicsModule.dll</HintPath><Private>false</Private></Reference>
+    <!-- painted designs: the spray canvas's decal projector (URP), its UI types, and the vehicle prefabs it is copied from -->
+    <Reference Include="Unity.RenderPipelines.Universal.Runtime"><HintPath>$(Interop)/Unity.RenderPipelines.Universal.Runtime.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(Interop)/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UIModule"><HintPath>$(Interop)/UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
     <ProjectReference Include="../MelangeCore/MelangeCore.csproj" Private="false" />
   </ItemGroup>
   <ItemGroup>

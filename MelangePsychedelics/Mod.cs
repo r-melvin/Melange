@@ -82,6 +82,7 @@ namespace Melange.Psychedelics
             Terraria.Reset();
             Frames.Reset();
             Wild.Reset();
+            WildlifeWarden.Forget();
             Stall.Reset();
             Looks.Reset();
         }

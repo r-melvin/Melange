@@ -11,7 +11,7 @@ namespace Melange.Psychedelics
     {
         private static MelonPreferences_Entry<int> _dust, _capacity, _breedDays, _starveDays, _nightOpen, _nightHours, _spores;
         private static MelonPreferences_Entry<float> _markup, _badBatch;
-        private static MelonPreferences_Entry<bool> _ergot, _pond, _sewer, _stall;
+        private static MelonPreferences_Entry<bool> _ergot, _pond, _sewer, _stall, _paint;
         private static MelonPreferences_Entry<string> _pondAt;
 
         public static void Create()
@@ -35,6 +35,9 @@ namespace Melange.Psychedelics
             _pond = c.CreateEntry("WildToads", true, "Wild toads at the pond", "Off: no toads, no wildlife officer.");
             _sewer = c.CreateEntry("SewerToads", true, "Toads in the sewer", "Off: none in the sewer.");
             _stall = c.CreateEntry("RandysStall", true, "Randy's stall", "Off: no stall behind Randy's Bait & Tackle.");
+            _paint = c.CreateEntry("PaintDesigns", false, "Paint your own blotter designs (experimental)",
+                "On: with a spray can in hand, spray a design onto a blotter frame's sheet with the game's graffiti screen; it becomes a " +
+                "new design (a brand) for that frame. Untested in game: see TESTING.md. Host only.");
             _pondAt = c.CreateEntry("PondPosition", "", "Pond position override",
                 "Leave empty to find the pond by itself. Otherwise \"x,y,z\" of the pond's centre (for a map change).");
         }
@@ -55,6 +58,7 @@ namespace Melange.Psychedelics
         public static bool WildToads => _pond?.Value ?? true;
         public static bool SewerToads => _sewer?.Value ?? true;
         public static bool Stall => _stall?.Value ?? true;
+        public static bool PaintDesigns => _paint?.Value ?? false;
 
         public static bool PondOverride(out UnityEngine.Vector3 at)
         {

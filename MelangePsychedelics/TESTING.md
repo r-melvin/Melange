@@ -57,6 +57,24 @@ Each: setup, then what to look for. "Host" means single player or the co-op host
 - Without a net: "You need a toad net". After the window closes the toads vanish. Reload during a window: caught spots stay
   empty (host).
 
+### P4b. The wildlife officer in person (Clive Mossop)
+- Setup: P4's pond found. Load a save, go to the pond.
+- Log `wildlife warden warped to his post at (x, y, z)` soon after load (S1API spawns him at its example spot, or at the
+  `PondPosition` override, then he is moved). Outside the window he stands 6 m outside spot 0, facing the water, in a
+  khaki bucket hat and shirt, olive trousers, a dark green vest and brown boots. Record whether he spawns at all (no
+  `wildlife warden:` warning), and how he looks (a ranger? the colours read as khaki and green?).
+- `settime 1900` until the toads are out: he walks the ring 1.5 m outside the toads, about one spot per 5 game minutes
+  (a lap in 40). Record whether he keeps up (if not, his real position still decides; he should never stand still), any
+  `wildlife warden can't walk` warnings, and whether he gets stuck on the bank (repeated `warped` lines every 30 s mean
+  the walk points are off the navmesh).
+- Catch a toad next to him: "Oi! Those toads are protected." over his head, and the log says `caught by the officer (seen
+  from spot i)`. Catch one on the far side of the pond from him: no fine. If the log says `(on the clock)` while he is
+  plainly at the pond, `TrySpot` didn't find him (record his distance from the pond's centre).
+- When the window closes he walks back to his post.
+- Co-op client: he walks the same lap on the client's screen (the host moves him), and a client's catch next to him is
+  fined. Record whether his movement shows on the client at all.
+- Fallback: with S1API's NPC spawning broken (or the class removed), the pond still works on the clock (P4).
+
 ### P5. Terrarium
 - Setup: buy and place a terrarium at a property. Check the tank model stands in for the storage rack, at the rack's
   footprint (record the scale), and that opening it shows the rack's slots.
@@ -131,8 +149,12 @@ Each: setup, then what to look for. "Host" means single player or the co-op host
 9. **The pond** is found by the object `StylizedWater2_Pond` (not seen in the data: the string is a material name in
    `sharedassets1`), else by any mesh whose material name contains "Pond". The toad spots are a ring 0.8 m outside the
    pond's bounds, dropped to the ground by a raycast. Its region is unknown.
-10. **The wildlife officer** has no body yet: his lap is a clock (40 minutes round 8 spots, seeing his spot and its
-    neighbours). A visible S1API NPC walking the ring needs the pond's coordinates first (P4).
+10. **The wildlife officer** is an S1API NPC (`WildlifeWarden`, ID `melange_psy_wildlife_warden`) with no schedule:
+    `Wild` sends him round the ring with `SetDestination` on the host, one spot ahead of the clock's spot, and warps him
+    when he is over 60 m from where he should be (at most every 30 s). Assumed: the destinations (dropped to the ground
+    by a raycast) are on the navmesh; disabling his schedule stops the game sending him elsewhere; his position syncs to
+    clients. What he sees is the spot nearest his real position and its neighbours, if he's within 15 m of the pond's
+    edge; otherwise (not spawned, lost) the 40-minute clock decides as before. He is a locked contact (no texts).
 11. **Randy**: Randy's Bait & Tackle has no shop screen in the data (an NPC building), so the stall is ours, beside the
     dead drop "Behind Randy's bait & tackle". The building's back door and Randy himself are not used.
 12. **The sewer**: toads sit 0.6 m to the side of the game's `SewerMushrooms.MushroomLocations`. Route: spared King (from
@@ -144,18 +166,63 @@ Each: setup, then what to look for. "Host" means single player or the co-op host
 14. **Ana**: S1API discovers her class itself; her hidden spawn is S1API's example spot. Her voice `female-2` and hair
     colour are guesses at a look.
 
-## Painted designs (next spike)
+## Painted designs (experimental, `PaintDesigns`)
 
-The plan's blotter art is player-painted with the game's spray can. Not built, because it needs answers only the game
-can give:
+Built behind the setting `PaintDesigns` (default **off**); see `SPRAY-SPIKE.md` for the game code it relies on. Nothing of
+it has run. With the setting off, nothing below happens and P9 is unchanged. Turn it on in
+`UserData/MelonPreferences.cfg` (`[MelangePsychedelics] PaintDesigns = true`) and load a save as host.
 
-1. Can a `SpraySurface` (a NetworkBehaviour) live on a cloned buildable? Option A: the frame's prefab is the storage
-   rack's, so a surface added at runtime is not a registered network behaviour. Option B: put a world surface
-   (`WorldSpraySurface`) on the frame's position, owned by the host, and replicate its strokes with
-   `SpraySurface.Set(conn, strokes, false)`.
-2. Does `GetSerializedDrawing()` give something that serialises to text (for `Design.Drawing`) and back through
-   `LoadSerializedDrawing`?
-3. Can `DrawingOutputTexture` be copied into a texture for the sheet's material and a sprite for the icon?
+### P10. The canvas copy
+- Place a blotter frame (or load a save with one). Log, once per session: `spray canvas template: <vehicle code> /
+  <object> (W x H), components: ...` (record all of it), then per frame `spray canvas copy: network object <name>, N
+  network object(s) inside` and `spray canvas on a frame: scale 0.200, centre (...), camera (...)`, maybe `turned round`.
+- Failure lines to record verbatim: `no vehicle prefab with a spray surface`, `parts outside the copy: ...`, `points at a
+  live network object`, any `spray canvas: <exception>`. Each turns painting off for that frame only; dosing still works.
+- Check: **N network object(s) inside** is 0 (a NetworkObject inside the copy is unexpected; note whether anything
+  complains). The named network object should be the vehicle prefab's.
+- Check: nothing visible changes on the frame with no spray can in hand (no outline, no decal on the wall behind, no stray
+  canvas in the world at 0,0,0). The base prompt reads `Design: Plain (new), or spray your own on the sheet`.
 
-When those are answered, `DesignBook.AddPainted(name, drawing)` already stores a painted design, and the frame cycles it
-like a preset.
+### P11. Painting
+- Buy a spray can (the game's `spraypaint`). Equip it and look at the frame's sheet. Expect the game's outline on the
+  sheet and the prompt **Use spray can** (the frame's `Dose` prompt hides while you hold the can; up to 1 s delay).
+- Interact: the camera moves in front of the sheet (record: square on? close enough? on the front, not inside or behind
+  the frame?), the graffiti menu opens. Paint in two colours and two brush sizes. Check: the paint appears **where the
+  cursor is, on the sheet** and nowhere else (not on the wall or floor behind, not mirrored); the remaining-paint bar falls.
+- Undo works. **Clear** clears (the mod's own handler; the game's does nothing on this copy). Record whether Clear needs
+  more than one click, and whether it leaves the undo button in a sensible state.
+- FishNet will log warnings like `Cannot complete action because client is not active` per stroke: expected, record how
+  many and whether anything else (errors, exceptions) appears. No "vandalizing" reaction from police nearby.
+- Done (or Esc, then confirm): one spray can is used, notification **New design**: `<Colour> design 1: dose sheets to
+  print it.`, log `painted design painted:1 (<Colour> design 1): N stroke(s), M chars`. The painting stays on the sheet
+  and the base prompt shows `Design: <Colour> design 1 (new)`.
+- With the can still equipped, no `Use spray can` on the painted sheet; with the graffiti cleaner equipped, no `Clean
+  graffiti` (its interaction is switched off while it shows a painted design).
+- Dose sheets: `Dosed ... of <Colour> design 1`, batches recorded under `painted:1`; trips move its reputation (P9).
+
+### P12. Keeping and reusing
+- Press the base: the cycle is the five built-ins then `<Colour> design 1`; on a built-in the sheet goes blank (and can be
+  painted: a second painting makes `painted:2`); back on the painted one it reappears **the same** (colours, brush sizes,
+  position).
+- Save, quit to menu, reload: log `loaded: ..., 6 design(s), ...`; the frame shows the painted design again; the
+  reputation and batches are kept. A second frame can select the same painted design.
+- Pick the frame up and put it down: a new canvas, same design shown.
+- Co-op: clients see no canvas and cannot paint (host only, as the design choice); record that nothing of the host's
+  painting shows up on any vehicle for the client (the copy must not reach the network).
+
+### Assumptions in the painted designs
+1. The vehicle prefabs in `VehicleManager.VehiclePrefabs` carry a `SpraySurface` with its `SpraySurfaceInteraction` on the
+   same object, and all its parts (BottomLeftPoint, Projector, IntObj, CameraPosition, Canvas, SprayImg, sounds, State)
+   are inside that object. The code checks this and refuses otherwise.
+2. The copy's `_networkObjectCache` is the prefab's NetworkObject, never initialised, so its RPCs stay local (checked by
+   the code; the IL2CPP generated RPC code is assumed the same as the Mono decompile's).
+3. `BottomLeftPoint` faces out with the canvas camera on its +Z side; the copy is turned if the camera ends up behind.
+4. Setting `DecalProjector.scaleMode = InheritFromHierarchy` makes the decal follow the 0.2 scale; its depth then catches
+   the frame's sheet 0.01 m behind the canvas.
+5. Width/Height set before the copy's Awake (it is made under an inactive parent) size the canvas, camera and prompt.
+6. One-second polling is enough: the Clear handler is added within a second of the screen opening, and a finished
+   painting is picked up within a second of closing.
+7. The game's own `SprayStroke.Serialize` drops the brush size, so designs are kept as the mod's text
+   (`s1:x0,y0,x1,y1,colour,size;...`); strokes the game could not draw on a 450 x 300 canvas are dropped.
+8. Not done: the LSD item's look and icon per design (needs per-item data, assumption 8); naming or retiring a painted
+   design; painting from a co-op client.

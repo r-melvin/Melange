@@ -10,8 +10,9 @@ namespace Melange.Psychedelics
     /// <summary>
     /// Wild toads. At the pond they come out for a few hours most evenings (PondSchedule) on spots round the water, while a
     /// wildlife officer walks his round (WildlifeOfficer): catching one he can see costs a fine, and from the third that night
-    /// a police look-in, and he takes the toad. In the sewer, once its story is open (SewerToads), a few sit by the game's own
-    /// mushroom spots. Catching needs a toad net in the pockets. The toads are local objects placed the same way on every
+    /// a police look-in, and he takes the toad. He is an NPC walking the ring when S1API has spawned him (WildlifeWarden), and
+    /// where he really is decides what he sees; without him, his clock does. In the sewer, once its story is open
+    /// (SewerToads), a few sit by the game's own mushroom spots. Catching needs a toad net in the pockets. The toads are local objects placed the same way on every
     /// peer (the schedule is rolled from the day); a catch is the catching player's own, like their cash and pockets.
     /// </summary>
     internal static class Wild
@@ -60,7 +61,8 @@ namespace Melange.Psychedelics
             if (!_pondSearched) FindPond();
             if (_spots.Count == 0) return;
             int day = Placed.Day, minute = Clock.ToMinutes(S1API.GameTime.TimeManager.CurrentTime);
-            var open = PondSchedule.OpenNow(Seed, day, minute, _spots.Count, out _);
+            var open = PondSchedule.OpenNow(Seed, day, minute, _spots.Count, out int into);
+            WildlifeWarden.Drive(_pond, _pondRadius, _spots.Count, into, open != null);
             if (open == null) { ClearPond(); return; }
             var data = Data;
             if (data.PondDay != open.Day) { data.PondDay = open.Day; data.PondCaught.Clear(); }
@@ -136,7 +138,8 @@ namespace Melange.Psychedelics
             if (open == null) return;
             Remove(spot);
             data.PondCaught.Add(spot);
-            if (WildlifeOfficer.Sees(spot, into, _spots.Count))
+            bool walking = WildlifeWarden.TrySpot(_pond, _pondRadius, _spots.Count, out int officerAt);
+            if (walking ? WildlifeOfficer.SeesFrom(spot, officerAt, _spots.Count) : WildlifeOfficer.Sees(spot, into, _spots.Count))
             {
                 int offence = ++data.PondOffences;
                 float fine = Penalty.Fine(offence);
@@ -154,8 +157,9 @@ namespace Melange.Psychedelics
                     }
                     catch (Exception e) { Mod.Log.Warning("pursuit: " + e.Message); }
                 }
+                if (walking) WildlifeWarden.Say(offence == 1 ? "Oi! Those toads are protected." : "Again? That's going on record.");
                 Items.Notify("Wildlife officer", $"Caught taking a protected toad: fined ${paid:N0} and the toad's confiscated.{more}");
-                Mod.Log.Msg($"pond: caught by the officer at spot {spot} ({into} min in), offence {offence}, fined {paid:N0}");
+                Mod.Log.Msg($"pond: caught by the officer ({(walking ? "seen from spot " + officerAt : "on the clock")}) at spot {spot} ({into} min in), offence {offence}, fined {paid:N0}");
                 return;
             }
             if (!Items.Give(Items.Make(Ids.LiveToad, 1, LiveToads.ItemTier(ToadOrigin.Wild))))

@@ -406,6 +406,55 @@ namespace Melange.Tests
             Assert.False(WildlifeOfficer.Sees(0, 0, 0));
         }
 
+        [Theory]
+        [InlineData(10.0, 0.0, 0)]
+        [InlineData(0.0, 10.0, 2)]
+        [InlineData(-10.0, 0.0, 4)]
+        [InlineData(0.0, -10.0, 6)]
+        [InlineData(7.0, 7.2, 1)]
+        [InlineData(10.0, -1.0, 0)]                                  // just below +x wraps to spot 0, not 8
+        [InlineData(7.0, -7.2, 7)]
+        public void TheWalkingOfficerIsAtTheSpotNearestHim(double dx, double dz, int spot)
+        {
+            Assert.Equal(spot, WildlifeOfficer.SpotNearest(dx, dz, 8));
+        }
+
+        [Fact]
+        public void TheWalkingOfficerNeedsSpotsAndAnOffset()
+        {
+            Assert.Equal(-1, WildlifeOfficer.SpotNearest(1, 1, 0));
+            Assert.Equal(-1, WildlifeOfficer.SpotNearest(0, 0, 8));
+        }
+
+        [Fact]
+        public void SeeingFromASpotMatchesTheClock()
+        {
+            for (int m = 0; m < WildlifeOfficer.LapMinutes; m++)
+                for (int s = 0; s < 8; s++)
+                    Assert.Equal(WildlifeOfficer.Sees(s, m, 8), WildlifeOfficer.SeesFrom(s, WildlifeOfficer.At(m, 8), 8));
+            Assert.False(WildlifeOfficer.SeesFrom(0, -1, 8));
+            Assert.False(WildlifeOfficer.SeesFrom(0, 8, 8));
+            Assert.False(WildlifeOfficer.SeesFrom(9, 0, 8));
+        }
+
+        [Fact]
+        public void TheWalkingOfficerHeadsForTheNextSpot()
+        {
+            Assert.Equal(1, WildlifeOfficer.Heading(0, 8));
+            Assert.Equal(0, WildlifeOfficer.Heading(WildlifeOfficer.LapMinutes - 1, 8));   // round the ring
+            Assert.Equal(-1, WildlifeOfficer.Heading(0, 0));
+        }
+
+        [Theory]
+        [InlineData(20.0, 10.0, true)]
+        [InlineData(25.0, 10.0, true)]
+        [InlineData(25.1, 10.0, false)]
+        [InlineData(200.0, 10.0, false)]
+        public void TheOfficerIsOnHisRoundNearThePond(double distance, double radius, bool on)
+        {
+            Assert.Equal(on, WildlifeOfficer.OnRound(distance, radius));
+        }
+
         [Fact]
         public void ThereIsAlwaysASafeSpotOnABigEnoughPond()
         {
@@ -657,6 +706,116 @@ namespace Melange.Tests
             var b = l.Add("x", 99, false, -3);
             Assert.Equal(Tier.Heavenly, b.Tier);
             Assert.Equal(0, b.Tabs);
+        }
+
+        // ---- painted designs: strokes as text ----
+
+        [Fact]
+        public void StrokesRoundTrip()
+        {
+            var strokes = new List<Stroke> { new Stroke(20, 30, 200, 150, 3, 24), new Stroke(100, 100, 100, 100, 1, 10), new Stroke(16, 16, 434, 284, 8, 32) };
+            string text = StrokeCodec.Encode(strokes);
+            Assert.Equal("s1:20,30,200,150,3,24;100,100,100,100,1,10;16,16,434,284,8,32", text);
+            Assert.Equal(strokes, StrokeCodec.Decode(text));
+            Assert.True(StrokeCodec.HasStrokes(text));
+        }
+
+        [Fact]
+        public void BrushSizeIsKept()
+        {
+            // the game's own SprayStroke.Serialize drops the size; ours must not
+            var back = StrokeCodec.Decode(StrokeCodec.Encode(new[] { new Stroke(50, 50, 60, 60, 2, 32) }));
+            Assert.Equal(32, back.Single().Size);
+        }
+
+        [Theory]
+        [InlineData(0, 24)]      // no colour
+        [InlineData(9, 24)]      // past Brown
+        [InlineData(1, 9)]       // brush too small
+        [InlineData(1, 33)]      // brush too big
+        public void BadColourOrBrushIsDropped(int color, int size)
+        {
+            Assert.Empty(StrokeCodec.Decode(StrokeCodec.Encode(new[] { new Stroke(100, 100, 120, 120, color, size) })));
+        }
+
+        [Theory]
+        [InlineData(4, 100, 10)]     // brush half-width 5 would leave the left edge
+        [InlineData(5, 100, 10)]     // just fits
+        [InlineData(446, 100, 10)]   // leaves the right edge (450 - 5 = 445)
+        [InlineData(445, 100, 10)]
+        [InlineData(100, 285, 32)]   // top: 300 - 16 = 284
+        public void BrushMustStayOnTheCanvas(int x, int y, int size)
+        {
+            bool fits = x >= (size + 1) / 2 && x <= StrokeCodec.CanvasWidth - (size + 1) / 2 && y >= (size + 1) / 2 && y <= StrokeCodec.CanvasHeight - (size + 1) / 2;
+            Assert.Equal(fits, StrokeCodec.Valid(new Stroke(x, y, x, y, 1, size), StrokeCodec.CanvasWidth, StrokeCodec.CanvasHeight));
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("strokes-a")]                                     // no prefix: not ours
+        [InlineData("s1:")]
+        [InlineData("s1:1,2,3")]
+        [InlineData("s1:a,b,c,d,e,f")]
+        [InlineData("s1:-20,30,200,150,3,24")]
+        [InlineData("s1:70000,30,200,150,3,24")]
+        [InlineData("s1:20,30,200,150,300,24")]
+        public void DamagedTextDecodesToNothing(string text)
+        {
+            Assert.Empty(StrokeCodec.Decode(text));
+            Assert.False(StrokeCodec.HasStrokes(text));
+        }
+
+        [Fact]
+        public void DamagedStrokesAreSkippedNotFatal()
+        {
+            var back = StrokeCodec.Decode("s1:20,30,200,150,3,24;junk;;1,1,1,1,1,1;40,40,50,50,5,16");
+            Assert.Equal(2, back.Count);
+            Assert.Equal(5, back[1].Color);
+        }
+
+        [Fact]
+        public void StrokeCountIsBounded()
+        {
+            var many = Enumerable.Range(0, StrokeCodec.MaxStrokes + 50).Select(i => new Stroke(100, 100, 101, 101, 1, 10));
+            Assert.Equal(StrokeCodec.MaxStrokes, StrokeCodec.Decode(StrokeCodec.Encode(many)).Count);
+        }
+
+        [Fact]
+        public void EncodeSkipsUndrawableStrokes()
+        {
+            Assert.Equal("s1:", StrokeCodec.Encode(new[] { new Stroke(0, 0, 0, 0, 1, 10) }));
+            Assert.Equal("s1:", StrokeCodec.Encode(null));
+        }
+
+        [Fact]
+        public void DesignIsNamedAfterItsMainColour()
+        {
+            var strokes = new[]
+            {
+                new Stroke(20, 20, 400, 20, 3, 32),    // a long, fat red line
+                new Stroke(20, 50, 60, 50, 5, 32),     // a short blue one
+                new Stroke(20, 80, 200, 80, 1, 10),    // a thin black one
+            };
+            Assert.Equal(3, DesignNamer.MainColor(strokes));
+            Assert.Equal("Red design 4", DesignNamer.Name(strokes, 4));
+            Assert.Equal("Plain design 1", DesignNamer.Name(new Stroke[0], 1));
+        }
+
+        [Fact]
+        public void PaintedDesignJoinsTheCycleAndKeepsItsStrokes()
+        {
+            var book = new DesignBook();
+            book.EnsurePresets();
+            var strokes = new[] { new Stroke(100, 100, 300, 200, 7, 24) };
+            var d = book.AddPainted(DesignNamer.Name(strokes, book.NextPainted), StrokeCodec.Encode(strokes));
+            Assert.Equal("Pink design 1", d.Name);
+            Assert.False(d.Preset);
+            Assert.Equal(strokes, StrokeCodec.Decode(book.Find(d.Id).Drawing));
+            Assert.Same(d, book.Next(DesignBook.Presets[^1].Id));          // after the last built-in
+            Assert.Equal(DesignBook.Presets[0].Id, book.Next(d.Id).Id);    // and round again
+            DesignBook.RecordTrip(d, true, Tier.Heavenly);
+            Assert.True(d.Reputation > 0f);
         }
 
         // ---- ids ----
