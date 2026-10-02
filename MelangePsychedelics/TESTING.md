@@ -6,7 +6,15 @@ Slughin); the pond is found at (93.78, 3.95, -121.23), radius 5.8 m, 8 spots; Ra
 Clive Mossop, the wildlife warden, spawns, warps to his post and was photographed in his ranger kit; with the toads out
 (window 19:45 for 210 min) and the player at the pond he walks the ring of spots, about a lap per 40 game minutes
 (sampled every 5 game minutes). Far from the player, with Siesta installed, he stands still: Siesta's Deep level pauses
-distant NPCs' movement, which is harmless here (nobody is at the pond to be seen). Everything past
+distant NPCs' movement, which is harmless here (nobody is at the pond to be seen). With the `psy` probe command
+(`probe-cmds.txt`): Randy's stall sells the net, terrarium and crickets by day (cash taken, items given) and toads at
+night ($240, then $276, 3/4 left); caught by the warden at spots 0 and 1 the fines are $250 then $500, the toad
+confiscated; unseen catches go to the pockets; a terrarium placed in the motel room takes 2 toads and 5 cricket tubs,
+milks 2 venom (then nothing until they recover), feeds over two nights (crickets 5 -> 3 -> 1, breeding 0 -> 1 -> 2);
+Ana's unlock opens the LSD recipe; a blotter frame with 3 blank sheets and 2 solutions doses 2 sheets of Sunburst
+(rolls 0.249 and 0.142 against 0.100: good); trip outcomes move the design's reputation. A full pocket (8 slots) refuses
+a catch or a purchase with a notification and takes no cash. Not run yet: breeding to a birth, toads turning to dust,
+selling to customers, painting, ergot growing, the sewer toads. Everything past
 loading (catching, the terrarium, the stall's prompts, dosing, painting) is not run yet.
 
 The pure logic (`Logic/`: husbandry, venom quality, lifespan, the pond's windows
