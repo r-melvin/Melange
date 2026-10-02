@@ -22,6 +22,11 @@ namespace Melange.Levels
         [SaveableField("candidates")] public int UnderbossCandidates;
         [SaveableField("discountStep")] public int DiscountStep;
         [SaveableField("prestige")] public int Prestige;
+        /// <summary>Offer kind -> the in-game day it was last used.</summary>
+        [SaveableField("offersUsed")] public Dictionary<string, int> OffersLastUsed = new Dictionary<string, int>();
+        [SaveableField("warehouseDay")] public int WarehouseDiscountDay = -1;
+
+        public int LastUsed(OfferKind kind) => OffersLastUsed.TryGetValue(kind.ToString(), out int d) ? d : -1;
 
         public MelangeLevelsData() { Current = this; }
 

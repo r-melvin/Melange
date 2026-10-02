@@ -50,7 +50,26 @@ namespace Melange.Levels
 
             Line($"Prestige: {data.Prestige}", 22, FontStyle.Bold);
             Line("Spend Prestige to make offers they can't refuse. Earned at every Kingpin tier after the first.", 14);
+            int today = OfferActions.Today();
+            foreach (OfferKind kind in Enum.GetValues(typeof(OfferKind)))
+            {
+                bool ok = Offers.Available(kind, data.Prestige, data.LastUsed(kind), today, out string why);
+                if (kind == OfferKind.RushOrder)
+                {
+                    var drops = OfferActions.PendingDrops();
+                    if (drops.Count == 0) { Line(Offers.Title(kind) + " (no dead drop on its way)", 14); continue; }
+                    foreach (var supplier in drops)
+                    {
+                        var s = supplier;
+                        Offer($"{Offers.Title(kind)}: {s.FirstName}", ok, why, () => OfferActions.RushOrder(s));
+                    }
+                }
+                else Offer(Offers.Title(kind), ok, why, () => OfferActions.WarehouseDiscount());
+            }
             Line($"Underbosses to hire: {data.UnderbossCandidates}", 18);
+            if (data.DiscountStep > 0)
+                Line($"Bulk discount: {BulkDiscount.PercentFor(data.DiscountStep):0}% off orders of {BulkDiscount.BulkFrom(OrderChannel.Shop)}+ units in shops " +
+                     $"and the delivery app, {BulkDiscount.BulkFrom(OrderChannel.Supplier)}+ from suppliers", 14);
 
             Line($"Employee slots to place: {data.SlotsLeft} (earned {data.EmployeeSlotsEarned} of {Schedule.EmployeeSlotsInAll})", 18, FontStyle.Bold);
             var owned = GameProperty.OwnedProperties;
@@ -73,6 +92,13 @@ namespace Melange.Levels
                 }
             }
             UIFactory.FitContentHeight(_list);
+        }
+
+        private void Offer(string title, bool ok, string why, Func<bool> act)
+        {
+            if (!ok) { Line($"{title} ({why})", 14); return; }
+            var (_, button, _) = UIFactory.ButtonWithLabel("Offer", $"{title}   [1 Prestige]", _list, new Color(0.35f, 0.25f, 0.08f), 520, 44);
+            button.onClick.AddListener((UnityAction)new Action(() => { act(); Refresh(); }));
         }
 
         private void Line(string text, int size, FontStyle style = FontStyle.Normal)

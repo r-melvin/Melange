@@ -88,6 +88,7 @@ namespace Melange.Core
         public static void Patch(HarmonyLib.Harmony harmony)
         {
             TryPatch(harmony, "XP", typeof(LevelManager), nameof(LevelManager.RpcWriter___Server_AddXP_3316948804), nameof(BeforeAddXp), nameof(AfterAddXp));
+            OrderTotals.Patch(harmony);
         }
 
         /// <summary>A patch that fails to apply turns off its events only, never the hub.</summary>

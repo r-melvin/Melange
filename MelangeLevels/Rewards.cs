@@ -20,6 +20,15 @@ namespace Melange.Levels
                     RankUpScreen.Register(rank, tier, Schedule.Describe(kind), null);
             Events.Subscribe<TierReached>(e => { if (Host.IsHost) Grant((int)e.Reached.Rank, e.Reached.Tier); });
             Events.Subscribe<SaveLoaded>(_ => AfterLoad());
+            Events.Subscribe<MainSceneLoaded>(_ => OfferActions.ForgetScene());
+            OfferActions.Start();
+            // bulk orders: the discount step held in this save, on every channel (none before Block Boss I)
+            OrderTotals.Register(new OrderModifier
+            {
+                Id = "levels.bulk",
+                Order = 10,
+                Multiplier = (channel, shop, units) => BulkDiscount.Multiplier(MelangeLevelsData.Current?.DiscountStep ?? 0, channel, units),
+            });
         }
 
         /// <summary>Once the save has loaded: re-apply employee bonuses, then grant anything reached but not yet rewarded.</summary>
