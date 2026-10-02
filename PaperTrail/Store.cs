@@ -10,7 +10,7 @@ using MelonLoader.Utils;
 namespace PaperTrail
 {
     /// <summary>What kind of save a snapshot came from.</summary>
-    public enum SaveKind { Manual, Auto, Sleep, BeforeRestore, Milestone, Safeguard }
+    public enum SaveKind { Manual, Auto, Sleep, BeforeRestore, Milestone, Safeguard, Imported }
 
     /// <summary>One snapshot's details, stored next to its copy of the save as snapshot.json.</summary>
     public sealed class SnapshotInfo
@@ -31,6 +31,9 @@ namespace PaperTrail
         public string Note { get; set; } = "";
         public bool Pinned { get; set; }
         public bool SaveHadErrors { get; set; }
+
+        /// <summary>For an imported save: its campaign's creation time (ticks), to tell whether it is the slot's campaign.</summary>
+        public long SaveCreatedTicks { get; set; }
 
         /// <summary>Why a Milestone or Safeguard save was taken: "Quest completed: ...", "Game updated 0.4.7f6 to 0.4.7f7".</summary>
         public string Reason { get; set; } = "";
@@ -78,8 +81,9 @@ namespace PaperTrail
         public string Organisation { get; set; } = "";
         public long SaveCreatedTicks { get; set; }
 
-        /// <summary>Set once its history was archived because another campaign took its slot.</summary>
+        /// <summary>Set when this history became one of its slot's backups, and why ("Before a new game").</summary>
         public DateTime? ArchivedUtc { get; set; }
+        public string BackupReason { get; set; } = "";
     }
 
     /// <summary>
@@ -114,17 +118,11 @@ namespace PaperTrail
 
         public static string SlotFolder(int slot) => Path.Combine(Root, "Slot_" + slot);
 
-        /// <summary>Histories of campaigns another campaign replaced in their slot, one folder each.</summary>
-        public static string ArchiveRoot => Path.Combine(Root, "Archive");
-        private static string CloudArchiveRoot => Path.Combine(CloudRoot, "Archive");
-
-        /// <summary>The archived campaigns, newest first.</summary>
-        public static List<string> Archives()
-            => Directory.Exists(ArchiveRoot)
-                ? Directory.GetDirectories(ArchiveRoot).Where(d => List(d).Count > 0).OrderByDescending(Path.GetFileName).ToList()
-                : new List<string>();
-
+        /// <summary>A slot's backups, one folder each: a campaign's whole history, or one save.</summary>
+        public static string BackupsFolder(int slot) => Path.Combine(Root, "Backups", "Slot_" + slot);
+        private static string CloudBackupsFolder(int slot) => Path.Combine(CloudRoot, "Backups", "Slot_" + slot);
         public static string GameSlotFolder(int slot) => Path.Combine(SavesRoot, "SaveGame_" + slot);
+
 
         /// <summary>Paper Trail's early builds were called SaveKeeper: their snapshots are renamed, once, for the mirror to find.</summary>
         public static void MigrateFolders()
@@ -188,8 +186,9 @@ namespace PaperTrail
                 }
                 if (other && List(slot).Count > 0)
                 {
-                    string archived = ArchiveLocked(slot, info);
-                    Mod.Log.Msg($"slot {slot} now holds {organisation}; the history of {Path.GetFileName(archived)} was archived");
+                    // Normally Paper Trail backed it up before the game replaced it (new game, import); this catches the rest.
+                    string moved = MoveHistoryLocked(slot, info, "Replaced in its slot");
+                    Mod.Log.Msg($"slot {slot} now holds {organisation}; the history of {Path.GetFileName(moved)} became a backup");
                     info = new CampaignInfo();
                 }
                 info.Slot = slot;
@@ -200,47 +199,68 @@ namespace PaperTrail
             }
         }
 
-        private static string ArchiveLocked(int slot, CampaignInfo info)
+        /// <summary>
+        /// Moves the slot's history into its backups, as one backup, and returns where it went. The synced copy moves
+        /// with it, or the mirror would bring the history back into the slot.
+        /// </summary>
+        internal static string MoveHistoryLocked(int slot, CampaignInfo info, string reason)
         {
             string org = info.Organisation.Length > 0 ? info.Organisation : List(slot).FirstOrDefault()?.Organisation ?? "";
-            string name = $"{DateTime.Now:yyyyMMdd-HHmmss}-slot{slot}-{SafeName(org)}";
+            string name = $"{DateTime.Now:yyyyMMdd-HHmmss}-{SafeName(org)}";
             info.Slot = slot;
             info.Organisation = org;
             info.ArchivedUtc = DateTime.UtcNow;
+            info.BackupReason = reason;
             SaveCampaign(slot, info);
-            Directory.CreateDirectory(ArchiveRoot);
-            var target = Path.Combine(ArchiveRoot, name);
+            Directory.CreateDirectory(BackupsFolder(slot));
+            var target = Path.Combine(BackupsFolder(slot), name);
             Directory.Move(SlotFolder(slot), target);
-            // The synced copy moves with it, or the mirror would bring the old history back into the slot.
             var cloud = Path.Combine(CloudRoot, "Slot_" + slot);
             if (Directory.Exists(cloud))
-                try { Directory.CreateDirectory(CloudArchiveRoot); Directory.Move(cloud, Path.Combine(CloudArchiveRoot, name)); }
-                catch (Exception e) { Mod.Log.Warning("could not archive the Steam Cloud copy: " + e.Message); }
+                try { Directory.CreateDirectory(CloudBackupsFolder(slot)); Directory.Move(cloud, Path.Combine(CloudBackupsFolder(slot), name)); }
+                catch (Exception e) { Mod.Log.Warning("could not move the Steam Cloud copy to the backups: " + e.Message); }
             Mirror.Request();
             return target;
         }
 
-        /// <summary>
-        /// Puts an archived campaign's history back as its slot's, archiving whatever history the slot has now. The
-        /// game's save in the slot is not touched; restore a snapshot after this.
-        /// </summary>
-        public static void Unarchive(string archive, int slot)
+        /// <summary>Makes a backup the slot's history again (the slot must have none now), its synced copy too.</summary>
+        internal static void MoveToSlotLocked(string backup, int slot)
         {
-            lock (Work.Disk)
+            string name = Path.GetFileName(backup);
+            if (Directory.Exists(SlotFolder(slot))) Directory.Delete(SlotFolder(slot), true);
+            Directory.Move(backup, SlotFolder(slot));
+            var cloud = Path.Combine(CloudBackupsFolder(slot), name);
+            var cloudSlot = Path.Combine(CloudRoot, "Slot_" + slot);
+            if (Directory.Exists(cloud) && !Directory.Exists(cloudSlot))
+                try { Directory.Move(cloud, cloudSlot); } catch (Exception e) { Mod.Log.Warning("could not move the Steam Cloud copy back: " + e.Message); }
+            var info = Campaign(slot);
+            info.Slot = slot;
+            info.ArchivedUtc = null;
+            info.BackupReason = "";
+            SaveCampaign(slot, info);
+            Mirror.Request();
+        }
+
+        /// <summary>The archive of 0.3.0 becomes the slots' backups: each archived campaign is a backup of its slot.</summary>
+        public static void MigrateArchive()
+        {
+            foreach (var (root, cloud) in new[] { (Root, false), (CloudRoot, true) })
             {
-                if (Directory.Exists(SlotFolder(slot)) && List(slot).Count > 0) ArchiveLocked(slot, Campaign(slot));
-                else if (Directory.Exists(SlotFolder(slot))) Directory.Delete(SlotFolder(slot), true);
-                string name = Path.GetFileName(archive);
-                Directory.Move(archive, SlotFolder(slot));
-                var cloud = Path.Combine(CloudArchiveRoot, name);
-                var cloudSlot = Path.Combine(CloudRoot, "Slot_" + slot);
-                if (Directory.Exists(cloud) && !Directory.Exists(cloudSlot))
-                    try { Directory.Move(cloud, cloudSlot); } catch (Exception e) { Mod.Log.Warning("could not move the Steam Cloud copy back: " + e.Message); }
-                var info = Campaign(slot);
-                info.Slot = slot;
-                info.ArchivedUtc = null;
-                SaveCampaign(slot, info);
-                Mirror.Request();
+                var archive = Path.Combine(root, "Archive");
+                if (!Directory.Exists(archive)) continue;
+                foreach (var dir in Directory.GetDirectories(archive))
+                {
+                    try
+                    {
+                        int slot = Campaign(dir).Slot;
+                        if (slot < 1 || slot > 5) slot = 1;
+                        var target = Path.Combine(cloud ? CloudBackupsFolder(slot) : BackupsFolder(slot), Path.GetFileName(dir));
+                        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                        if (!Directory.Exists(target)) Directory.Move(dir, target);
+                    }
+                    catch (Exception e) { Mod.Log.Warning($"could not move {Path.GetFileName(dir)} to the backups: {e.Message}"); }
+                }
+                try { if (!Directory.EnumerateFileSystemEntries(archive).Any()) Directory.Delete(archive); } catch { }
             }
         }
 
@@ -277,20 +297,109 @@ namespace PaperTrail
             return list.OrderByDescending(s => s.CreatedUtc).ToList();
         }
 
+        /// <summary>
+        /// Adds a save file (a zip, as the game's Export makes) to the slot's list as an imported save. Nothing in the
+        /// game's slot changes until it is loaded. Returns null when the zip holds no save.
+        /// </summary>
+        public static SnapshotInfo ImportSave(int slot, string zipPath)
+        {
+            lock (Work.Disk)
+            {
+                string temp = Path.Combine(Root, "Import.partial");
+                if (Directory.Exists(temp)) Directory.Delete(temp, true);
+                try
+                {
+                    ZipFile.ExtractToDirectory(zipPath, temp);
+                    var game = Directory.GetFiles(temp, "Game.json", SearchOption.AllDirectories).OrderBy(f => f.Length).FirstOrDefault();
+                    if (game == null) return null;
+                    string saveDir = Path.GetDirectoryName(game)!;
+                    var info = new SnapshotInfo
+                    {
+                        Kind = SaveKind.Imported,
+                        Location = "Imported",
+                        Note = Path.GetFileNameWithoutExtension(zipPath),
+                        GameVersion = ReadString(game, "GameVersion"),
+                        Organisation = ReadString(game, "OrganisationName"),
+                        NetWorth = (float)ReadNumber(Path.Combine(saveDir, "Money.json"), "Networth"),
+                        GameDay = (int)ReadNumber(Path.Combine(saveDir, "Time.json"), "ElapsedDays") + 1,
+                        GameTime = (int)ReadNumber(Path.Combine(saveDir, "Time.json"), "TimeOfDay"),
+                        PlaySeconds = ReadNumber(Path.Combine(saveDir, "Time.json"), "Playtime"),
+                        SaveCreatedTicks = ReadCreated(Path.Combine(saveDir, "Metadata.json")),
+                        CreatedUtc = DateTime.UtcNow,
+                    };
+                    string name = info.CreatedUtc.ToString("yyyyMMdd-HHmmss-fff") + "-imported";
+                    var final = Path.Combine(SlotFolder(slot), name);
+                    var building = final + ".partial";
+                    Directory.CreateDirectory(building);
+                    // Repacked in the game's own layout, whatever folder (or none) the file had its save in.
+                    ZipTree(saveDir, Path.Combine(building, "save.zip"), "SaveGame_" + slot);
+                    var files = Directory.GetFiles(saveDir, "*", SearchOption.AllDirectories);
+                    info.FileCount = files.Length;
+                    info.TotalBytes = files.Sum(f => new FileInfo(f).Length);
+                    File.WriteAllText(Path.Combine(building, InfoFile), JsonSerializer.Serialize(info, Json));
+                    Directory.Move(building, final);
+                    info.Folder = final;
+                    Mirror.Request();
+                    return info;
+                }
+                finally { try { if (Directory.Exists(temp)) Directory.Delete(temp, true); } catch { } }
+            }
+        }
+
+        /// <summary>Is this save from a campaign other than the one in the slot?</summary>
+        public static bool IsOtherCampaign(int slot, SnapshotInfo save)
+        {
+            var campaign = Campaign(slot);
+            if (campaign.SaveCreatedTicks != 0 && save.SaveCreatedTicks != 0)
+                return Math.Abs(campaign.SaveCreatedTicks - save.SaveCreatedTicks) > TimeSpan.TicksPerSecond * 2;
+            string org = campaign.Organisation.Length > 0 ? campaign.Organisation : List(slot).FirstOrDefault(s => s.Kind != SaveKind.Imported)?.Organisation ?? "";
+            return org.Length > 0 && !string.Equals(org, save.Organisation, StringComparison.Ordinal);
+        }
+
+        private static JsonElement? ReadJson(string file)
+        {
+            try { return File.Exists(file) ? JsonDocument.Parse(File.ReadAllText(file)).RootElement : (JsonElement?)null; }
+            catch { return null; }
+        }
+
+        private static string ReadString(string file, string name)
+            => ReadJson(file) is JsonElement e && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
+
+        private static double ReadNumber(string file, string name)
+            => ReadJson(file) is JsonElement e && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : 0;
+
+        private static long ReadCreated(string file)
+        {
+            try
+            {
+                if (!(ReadJson(file) is JsonElement e) || !e.TryGetProperty("CreationDate", out var d)) return 0;
+                int Get(string n) => d.TryGetProperty(n, out var v) ? v.GetInt32() : 0;
+                return new DateTime(Get("Year"), Get("Month"), Get("Day"), Get("Hour"), Get("Minute"), Get("Second")).Ticks;
+            }
+            catch { return 0; }
+        }
+
         /// <summary>Copies the slot's save as it is on disk now into a new snapshot.</summary>
         public static SnapshotInfo Take(int slot, SnapshotInfo info)
         {
-            lock (Work.Disk) return TakeLocked(slot, info);
+            lock (Work.Disk) return TakeLocked(slot, info, SlotFolder(slot));
         }
 
-        private static SnapshotInfo TakeLocked(int slot, SnapshotInfo info)
+        /// <summary>The same, into another campaign folder (a backup).</summary>
+        internal static SnapshotInfo TakeInto(int slot, SnapshotInfo info, string folder)
+        {
+            lock (Work.Disk) return TakeLocked(slot, info, folder);
+        }
+
+        private static SnapshotInfo TakeLocked(int slot, SnapshotInfo info, string folder)
         {
             var source = GameSlotFolder(slot);
             if (!Directory.Exists(source)) throw new DirectoryNotFoundException(source);
 
             info.CreatedUtc = DateTime.UtcNow;
             string name = info.CreatedUtc.ToString("yyyyMMdd-HHmmss-fff") + "-" + info.Kind.ToString().ToLowerInvariant();
-            var final = Path.Combine(SlotFolder(slot), name);
+            Directory.CreateDirectory(folder);
+            var final = Path.Combine(folder, name);
             var temp = final + ".partial";
             if (Directory.Exists(temp)) Directory.Delete(temp, true);
 
@@ -365,25 +474,18 @@ namespace PaperTrail
         }
 
         /// <summary>
-        /// Puts a snapshot back into the game's slot. The slot's current state is snapshotted first, so a
-        /// restore can itself be undone. Only call with that slot not loaded.
+        /// Puts a snapshot back into the game's slot. Only call with that slot not loaded, and with what is in it
+        /// backed up first if it matters (see <see cref="Backups"/>).
         /// </summary>
-        public static void Restore(int slot, SnapshotInfo snapshot, SnapshotInfo current)
+        public static void Restore(int slot, SnapshotInfo snapshot)
         {
-            lock (Work.Disk) RestoreLocked(slot, snapshot, current);
+            lock (Work.Disk) RestoreLocked(slot, snapshot);
         }
 
-        private static void RestoreLocked(int slot, SnapshotInfo snapshot, SnapshotInfo current)
+        private static void RestoreLocked(int slot, SnapshotInfo snapshot)
         {
             var target = GameSlotFolder(slot);
             if (!snapshot.IsZip && !Directory.Exists(snapshot.DataFolder)) throw new DirectoryNotFoundException(snapshot.Folder);
-            if (Directory.Exists(target) && current != null)
-            {
-                current.Kind = SaveKind.BeforeRestore;
-                current.Pinned = true;
-                current.Note = "Kept before loading " + ShortName(snapshot);
-                Take(slot, current);
-            }
 
             // Copied beside the slot first and swapped in, so a failure never leaves the slot half-written.
             var incoming = target + ".papertrail-incoming";

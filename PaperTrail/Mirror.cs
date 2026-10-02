@@ -24,7 +24,7 @@ namespace PaperTrail
         private static string Tombstones => Path.Combine(Store.LocalRoot, "deleted.txt");
 
         /// <summary>Forgets a deleted snapshot, so the mirror removes it from the synced folder and does not restore it.</summary>
-        /// <param name="campaign">The campaign's folder, relative to the snapshots root: "Slot_2" or "Archive/...".</param>
+        /// <param name="campaign">The campaign's folder, relative to the snapshots root: "Slot_2" or "Backups/Slot_2/...".</param>
         public static void Deleted(string campaign, string name)
         {
             try
@@ -108,17 +108,20 @@ namespace PaperTrail
                 Mod.Log.Msg($"snapshots synced with Steam Cloud: {toCloud} sent, {toLocal} brought back, {removed} removed");
         }
 
-        /// <summary>The five slots' histories and every archived one, on either side ("Slot_1", "Archive/...").</summary>
+        /// <summary>The five slots' histories and every backup, on either side ("Slot_1", "Backups/Slot_1/...").</summary>
         private static IEnumerable<string> CampaignFolders()
         {
             for (int slot = 1; slot <= 5; slot++) yield return "Slot_" + slot;
-            var archives = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var root in new[] { Store.LocalRoot, Store.CloudRoot })
+            for (int slot = 1; slot <= 5; slot++)
             {
-                var dir = Path.Combine(root, "Archive");
-                if (Directory.Exists(dir)) foreach (var d in Directory.GetDirectories(dir)) archives.Add(Path.GetFileName(d));
+                var backups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var root in new[] { Store.LocalRoot, Store.CloudRoot })
+                {
+                    var dir = Path.Combine(root, "Backups", "Slot_" + slot);
+                    if (Directory.Exists(dir)) foreach (var d in Directory.GetDirectories(dir)) backups.Add(Path.GetFileName(d));
+                }
+                foreach (var name in backups) yield return $"Backups/Slot_{slot}/{name}";
             }
-            foreach (var name in archives) yield return "Archive/" + name;
         }
 
         private static HashSet<string> Names(string folder)

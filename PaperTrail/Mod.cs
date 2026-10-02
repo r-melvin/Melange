@@ -62,6 +62,7 @@ namespace PaperTrail
             Instance = this;
             Settings.Register();
             Milestones.PatchGameEvents(HarmonyInstance);
+            SlotGuard.Patch(HarmonyInstance);
             try
             {
                 HarmonyInstance.Patch(AccessTools.Method(typeof(SleepController), "RpcLogic___StartSleep_2166136261"),
@@ -140,9 +141,12 @@ namespace PaperTrail
                 if (snapshot == null) Safeguard(slot);
                 if (snapshot != null)
                 {
-                    SnapshotInfo keep = null;
-                    if (!Store.SlotIsKept(slot)) keep = DescribeSlotAsSaved(slot, snapshot);
-                    Store.Restore(slot, snapshot, keep);
+                    // What the slot holds now is backed up first (the screen made room when the slot was full): the whole
+                    // campaign when an imported save of another campaign takes the slot, else its current save if Paper
+                    // Trail does not already have it.
+                    if (snapshot.Kind == SaveKind.Imported && Store.IsOtherCampaign(slot, snapshot)) snapshot = BringInImported(slot, snapshot);
+                    else if (!Store.SlotIsKept(slot)) Announce(Backups.BackUpSave(slot, "Before loading an older save"), slot);
+                    Store.Restore(slot, snapshot);
                     var campaign = Store.Campaign(slot);
                     campaign.PlaySeconds = snapshot.PlaySeconds;      // play time goes back with the save
                     Store.SaveCampaign(slot, campaign);
@@ -188,77 +192,47 @@ namespace PaperTrail
         /// moment a save's contents can change under it. Nothing is kept when the slot already matches a snapshot.
         /// </summary>
         /// <summary>
-        /// Loads a snapshot of an archived campaign: it goes back into the slot it was played in. The slot's current
-        /// save is kept first as the last save of the slot's current history, and that history is archived in turn,
-        /// so nothing is lost and the two campaigns' saves never mix.
+        /// An imported save of another campaign is about to take the slot: the slot's campaign becomes a backup, and the
+        /// imported save starts the new campaign's history.
         /// </summary>
-        public static void LoadArchived(string archive, int slot, SnapshotInfo snapshot, bool fromGame)
+        private static SnapshotInfo BringInImported(int slot, SnapshotInfo imported)
+        {
+            lock (Work.Disk)
+            {
+                string aside = Path.Combine(Store.Root, Path.GetFileName(imported.Folder) + ".aside");
+                Directory.Move(imported.Folder, aside);
+                Announce(Backups.BackUpCampaign(slot, "Before loading an imported save"), slot);
+                Directory.CreateDirectory(Store.SlotFolder(slot));
+                string back = Path.Combine(Store.SlotFolder(slot), Path.GetFileName(imported.Folder));
+                Directory.Move(aside, back);
+                imported.Folder = back;
+                Store.SaveCampaign(slot, new CampaignInfo { Slot = slot, Organisation = imported.Organisation, SaveCreatedTicks = imported.SaveCreatedTicks });
+                return imported;
+            }
+        }
+
+        /// <summary>Says a backup was made, on screen for a few seconds, so the user knows where the slot's save went.</summary>
+        internal static void Announce(Backup backup, int slot)
+        {
+            if (backup != null)
+                Notice.Show($"Backed up {backup.Info.Organisation} from slot {slot} ({Backups.Of(slot).Count}/{Backups.Limit})");
+        }
+
+        /// <summary>Restores one of the slot's backups (swapping it with what the slot holds) and loads it.</summary>
+        internal static void LoadBackup(Backup backup, int slot, bool fromGame)
         {
             try
             {
-                lock (Work.Disk)
-                {
-                    var info = LoadManager.SaveGames != null && slot - 1 < LoadManager.SaveGames.Length ? LoadManager.SaveGames[slot - 1] : null;
-                    if (info != null && Directory.Exists(Store.GameSlotFolder(slot)))
-                    {
-                        var keep = DescribeSlotAsSaved(slot, snapshot);
-                        keep.Organisation = info.OrganisationName ?? "";
-                        keep.Kind = SaveKind.BeforeRestore;
-                        keep.Pinned = true;
-                        keep.Note = $"Kept before loading the archived campaign {snapshot.Organisation}";
-                        Store.Take(slot, keep);
-                    }
-                    Store.Unarchive(archive, slot);
-                    // The snapshot moved with its campaign's folder: restore it from where it is now.
-                    snapshot.Folder = Path.Combine(Store.SlotFolder(slot), Path.GetFileName(snapshot.Folder));
-                    Store.Restore(slot, snapshot, null);
-                    var campaign = Store.Campaign(slot);
-                    campaign.PlaySeconds = snapshot.PlaySeconds;
-                    Store.SaveCampaign(slot, campaign);
-                }
-                Log.Msg($"brought back archived campaign {snapshot.Organisation} into slot {slot}: {Store.Describe(snapshot)}");
+                Backups.Restore(backup, slot);
+                Log.Msg($"restored backup {backup.Info.Organisation} into slot {slot}");
             }
             catch (Exception e)
             {
-                Log.Error("could not bring back the archived campaign: " + e);
-                SaveScreen.ShowFailure("The archived campaign could not be loaded; see the log. Nothing was deleted.");
+                Log.Error("could not restore the backup: " + e);
+                SaveScreen.ShowFailure("The backup could not be restored; see the log. Nothing was deleted.");
                 return;
             }
             LoadNow(slot, null, fromGame);
-        }
-
-        /// <summary>
-        /// The details of a slot as it is on disk, for the copy kept before a snapshot replaces it: those of the
-        /// snapshot it still matches (place, day, money), or the game's own save info when none does.
-        /// </summary>
-        private static SnapshotInfo DescribeSlotAsSaved(int slot, SnapshotInfo replacing)
-        {
-            var keep = new SnapshotInfo
-            {
-                Location = "Last save",
-                PlaySeconds = Store.Campaign(slot).PlaySeconds,
-                Organisation = replacing.Organisation,
-                GameVersion = Application.version,
-            };
-            // The copy is of the save in the slot now, so it carries that save's organisation, not the one replacing it.
-            try { var now = LoadManager.SaveGames[slot - 1]?.OrganisationName; if (!string.IsNullOrEmpty(now)) keep.Organisation = now; } catch { }
-            var same = Store.List(slot).Take(5).FirstOrDefault(s => Store.SlotMatches(slot, s));
-            if (same != null)
-            {
-                keep.Location = same.Location;
-                keep.GameDay = same.GameDay;
-                keep.GameTime = same.GameTime;
-                keep.NetWorth = same.NetWorth;
-                keep.Cash = same.Cash;
-                keep.Online = same.Online;
-                keep.Rank = same.Rank;
-                keep.PlaySeconds = same.PlaySeconds;
-            }
-            else
-            {
-                try { keep.NetWorth = LoadManager.SaveGames[slot - 1]?.Networth ?? 0f; } catch { }
-            }
-            return keep;
         }
 
         private static void Safeguard(int slot)
@@ -353,6 +327,7 @@ namespace PaperTrail
             Store.SavesRoot = sm.IndividualSavesContainerPath;
             _hooked = true;
             Store.MigrateFolders();
+            try { Store.MigrateArchive(); } catch (Exception e) { Log.Warning("could not move the archive to the backups: " + e.Message); }
             Work.Run(() =>
             {
                 try
@@ -415,6 +390,7 @@ namespace PaperTrail
         public override void OnUpdate()
         {
             SaveScreen.Tick();
+            Notice.Tick();
             if (!InGame(out var lm)) { if (_slot != 0 && (lm == null || !lm.IsGameLoaded)) LeaveGame(); return; }
             if (_slot == 0) EnterGame(lm);
             if (_slot < 0) return;

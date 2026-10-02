@@ -12,7 +12,7 @@ namespace PaperTrail
         private static MelonPreferences_Entry<bool> _continueOnStartup, _autoSaveEnabled, _syncCloud;
         private static MelonPreferences_Entry<bool> _quest, _dealer, _property, _rank, _cartel, _customer, _region, _supplier;
         private static MelonPreferences_Entry<bool> _beforeUpdate, _beforeModChange;
-        private static MelonPreferences_Entry<int> _everyHours, _kept, _keptMoments, _manualKept, _copiesKept;
+        private static MelonPreferences_Entry<int> _everyHours, _kept, _keptMoments, _manualKept, _copiesKept, _backups;
 
         public static void Register()
         {
@@ -51,6 +51,11 @@ namespace PaperTrail
                 "The copies kept before a restore, a game update or a mod change. The newest this many are kept; pin one to keep it for good.",
                 false, false, new ValueRange<int>(3, 50));
 
+            _backups = storage.CreateEntry("BackupsPerSlot", 3, "Backups kept per slot",
+                "A backup is made before anything replaces what is in a slot: a new game, an import, or loading an older save. When a "
+                + "slot has this many, you are asked to delete or export one first. A backup of a whole campaign keeps all its saves.",
+                false, false, new ValueRange<int>(1, 10));
+
             var safe = MelonPreferences.CreateCategory("PaperTrail_04_Safeguards", "Paper Trail - Safeguards");
             _beforeUpdate = safe.CreateEntry("KeepCopyBeforeGameUpdate", true, "Keep a copy before a save moves to a newer game version",
                 "When a save made on an older game version is about to be loaded by a newer one, its current state is kept first.");
@@ -68,6 +73,7 @@ namespace PaperTrail
         public static int AutoSavesKept => _kept?.Value ?? 10;
         public static int ManualSavesKept => _manualKept?.Value ?? 30;
         public static int KeptCopiesKept => _copiesKept?.Value ?? 10;
+        public static int BackupsPerSlot => _backups?.Value ?? 3;
         public static int KeyMomentSavesKept => _keptMoments?.Value ?? 30;
         public static bool OnQuest => _quest?.Value ?? true;
         public static bool OnDealer => _dealer?.Value ?? true;

@@ -14,6 +14,17 @@ namespace PaperTrail
     {
         public static GameObject Background, Title, Row, SmallButton, Hint, DialogBack, DialogConfirm, InputField;
         public static Sprite FrameSprite, RoundedSprite;
+
+        /// <summary>The game's own UI icons the save screen uses (its pencil, bin, star and arrows), by sprite name.</summary>
+        private static readonly System.Collections.Generic.Dictionary<string, Sprite> Icons = new System.Collections.Generic.Dictionary<string, Sprite>();
+        public static Sprite Icon(string name)
+        {
+            if (Icons.TryGetValue(name, out var found) && found != null) return found;
+            // Captured at the main menu; a scene change can unload it, so look again (the game's UI has them loaded).
+            foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
+                if (sprite != null && sprite.name == name) { Icons[name] = sprite; return sprite; }
+            return null;
+        }
         public static UnityEngine.UI.CanvasScaler.ScaleMode ScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
         public static Vector2 ReferenceResolution = new Vector2(1920, 1080);
         public static float Match = 0.5f;
@@ -92,6 +103,10 @@ namespace PaperTrail
                         }
                     }
                 }
+                foreach (var sprite in Resources.FindObjectsOfTypeAll<Sprite>())
+                    if (sprite != null && (sprite.name == "edit" || sprite.name == "trash can" || sprite.name == "star"
+                                           || sprite.name == "arrow" || sprite.name == "arrow 1"))
+                        Icons[sprite.name] = sprite;
                 var title = Title != null ? Title.GetComponent<TextMeshProUGUI>() : null;
                 if (title != null) Ui.Font = title.font;
                 Mod.Log.Msg(Ready ? "templates: using the game's own panel, rows and buttons"
