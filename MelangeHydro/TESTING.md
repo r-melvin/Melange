@@ -207,3 +207,10 @@ Each has a probe above; none has been seen in the game.
 - Curing on a co-op client follows its own first sighting of the grown plant (no extra network message).
 - Holes have the Grow Tent's 2x2 footprint in Individual mode, so they are no denser than pots.
 - Without the mod, a Juicer-fed plant's saved additive is unknown to the game (see P12).
+
+## Results so far
+
+- **Registration passed in game** (2026-10-02, slot 1, IL2CPP): the tray and tower sections, the pump and Grow N Juicer
+  are listed at Handy Hank's and Dan's Hardware, rank-locked by the game at Underlord III, Baron III, Underlord III and
+  Kingpin III; placement mode Individual. The full Hydro Tray and Aeroponic Tower items are registered but not listed
+  (grouped placement only).

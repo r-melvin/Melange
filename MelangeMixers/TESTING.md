@@ -147,3 +147,10 @@ Install: `MelangeCore.dll`, `MelangeMixers.dll`, S1API (the IL2CPP build the rep
 - No recipe for multi-step products in recipe viewers (by design: the game's recipes can't hold more than one mixer).
 - One naming gives 80 XP, where chaining could give up to 80 per new intermediate.
 - Removing the mod loses the machines and their contents; empty them first.
+
+## Results so far
+
+- **P1 passed in game** (2026-10-02, slot 1, IL2CPP): the Mk2 is `mixingstationmk2` at $2,000; the three mixers register
+  at $6,000 / $12,000 / $20,000, are listed at Oscar's Store (code `shop`) only, and are rank-locked by the game at
+  Underlord I, Baron I and Kingpin I. (Oscar's Equipment also sells the Mk2; the mixers are not listed there.)
+- P2-P11 need placing and running a machine: not yet scripted.

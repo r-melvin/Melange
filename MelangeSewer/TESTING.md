@@ -155,3 +155,11 @@ Each: setup, then what to look for. "Host" means single player or the co-op host
 - **S1API quest restore**: S1API recreates an active "Down the Drain" on load; `DownTheDrain.Sync` overwrites its entry
   states from the spoke's data every second. [Assumed the restore happens before the hub's `SaveLoaded`; if not, a second
   quest could be created: P11 checks for duplicates.]
+
+## Results so far
+
+- **P1-P3 passed in game** (2026-10-02, slot 1, IL2CPP): loaded at step Locked with no wiring warnings; Jen found and her
+  key sale closed; her vanilla offer line is "I wanna help you, but I'll be out of a job if the mayor finds out. I'll need
+  <PRICE> for it to be worth the risk."; slot 1's King was already dead (the game's flag), so the fate is KingDefeated;
+  reaching Bagman V offered the quest exactly once (step TalkToJerry); Oscar's ENTRY and NPC_HINT lines are rewritten.
+- P4 onwards need dialogue with Jerry and walking the sewer: not yet scripted.
