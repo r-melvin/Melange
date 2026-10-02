@@ -1,6 +1,6 @@
 # Melange Hydro: in-game checks
 
-Nothing here has run in the game yet. The build compiles against 0.4.7f7 IL2CPP and the pure logic (`Logic/`) is unit
+Registration and placement have run in the game (Results so far, at the end); the rest has not. The build compiles against 0.4.7f7 IL2CPP and the pure logic (`Logic/`) is unit
 tested (`Melange.Tests/HydroTests.cs`); everything below needs the game. Each probe says what to set up, what to read in
 `MelonLoader/Latest.log` (lines from this mod start `[Melange_Hydro]`), and what should happen. Run them in order: later
 ones assume earlier ones passed.
@@ -40,7 +40,7 @@ creates the frame's other holes (P11). The grouped path is unproven; switch to i
 ### P3. Placing a section (Individual)
 - Set up: buy one Hydro Tray Section and one Aeroponic Tower Section; place both in an owned property (any 2x2 floor spot:
   a section takes the Grow Tent's footprint).
-- Log (every player's game): `Hydro Tray Section <guid>: drain 0.139/h of 5, yield x1`;
+- Log (every player's game, with `Verbose` on): `Hydro Tray Section <guid>: drain 0.139/h of 5, yield x1`;
   `Aeroponic Tower Section <guid>: drain 0.208/h of 5, yield x1.5` (5 is the tent's capacity read from the game; the drain
   is capacity / 36 and / 24 hours. If capacity is not 5, drain = capacity / hours still holds.)
 - Log (host, within a second): `...: grow medium in (20 harvests), reservoir full`.
@@ -251,3 +251,8 @@ Each has a probe above; none has been seen in the game.
   are listed at Handy Hank's and Dan's Hardware, rank-locked by the game at Underlord III, Baron III, Underlord III and
   Kingpin III; placement mode Individual. The full Hydro Tray and Aeroponic Tower items are registered but not listed
   (grouped placement only).
+- **P3 placement and persistence passed in game** (2026-10-02, slot 1, scripted with the probe's `S1P.place`): a Hydro
+  Tray Section and an Aeroponic Tower Section (2x2 each) and the pump (2x1) placed in the motel room. Both sections log
+  `grow medium in (20 harvests), reservoir full`; the pump `hosed to the tap 3.4 m away`. After a save and reload all three
+  are back with their GUIDs; the sections' holes are in `Modded/Saveables/MelangeHydroData/holes.json` (`2 hole(s) in
+  this save`), the pump in `Properties/Motel Room.json`. Growing, the botanist and the clipboard are not run yet.

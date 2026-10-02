@@ -3,7 +3,10 @@
 **Run in game so far** (2026-10-02, slot 1, IL2CPP): P1 load and registration pass (vanilla shroom line `sporesyringe` /
 `shroomspawn` / `shroom`; ergot registered and listed at Fungal Phil; Toad and LSD ready; the LSD recipe locked until Ana
 Slughin); the pond is found at (93.78, 3.95, -121.23), radius 5.8 m, 8 spots; Randy's stall at (-95.32, 4.36, -36.96);
-Clive Mossop, the wildlife warden, spawns, warps to his post and was photographed in his ranger kit. Everything past
+Clive Mossop, the wildlife warden, spawns, warps to his post and was photographed in his ranger kit; with the toads out
+(window 19:45 for 210 min) and the player at the pond he walks the ring of spots, about a lap per 40 game minutes
+(sampled every 5 game minutes). Far from the player, with Siesta installed, he stands still: Siesta's Deep level pauses
+distant NPCs' movement, which is harmless here (nobody is at the pond to be seen). Everything past
 loading (catching, the terrarium, the stall's prompts, dosing, painting) is not run yet.
 
 The pure logic (`Logic/`: husbandry, venom quality, lifespan, the pond's windows
