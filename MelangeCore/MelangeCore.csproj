@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Melange Core: the hub every Melange spoke depends on. It owns the game patches, events and services spokes share;
+       it has no gameplay of its own. Shared settings: ../Directory.Build.props -->
+  <PropertyGroup>
+    <AssemblyName>MelangeCore</AssemblyName>
+    <RootNamespace>Melange.Core</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+</Project>

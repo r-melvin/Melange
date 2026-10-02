@@ -7,6 +7,7 @@ share is compiled into each of them, never shipped as a separate library.
 | Mod | What it does | Status |
 |---|---|---|
 | [Paper Trail](PaperTrail/README.md) | Save/load manager: rolling auto-saves at safe moments, every save kept and loadable from the main menu or pause menu, and backups of each slot. | 0.4.0 |
+| [Melange Core](MelangeCore/) | The hub the upcoming Melange mods build on: shared game events (scenes, XP, rank-ups), an event bus, a host check and a version check. No gameplay of its own; not needed by Paper Trail. | 0.1.0 (unreleased) |
 
 Looking for the fixes for other people's mods? Those are
 [Schedule I Unofficial Mod Fixes (S1UMF)](https://github.com/r-melvin/S1UMF).
