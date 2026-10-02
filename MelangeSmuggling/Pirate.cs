@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Il2CppScheduleOne.AvatarFramework;
+using Il2CppScheduleOne.Core.Avatar;
 using UnityEngine;
 using Avatar = Il2CppScheduleOne.AvatarFramework.Avatar;
 
@@ -201,15 +203,53 @@ namespace Melange.Smuggling
             return Has(path, "Cowboy") || Has(name, "Cowboy") || Has(a.gameObject.name, "Cowboy");
         }
 
+        /// <summary>
+        /// The cowboy hat's game objects. Since 0.4.7 an avatar wears <c>AvatarObject</c>s (S1API's accessory path maps to one;
+        /// in game it is <c>cowboyhat</c>), not <c>Accessory</c> components, and the object's meshes are on its attachments,
+        /// which it re-parents to the skeleton. The old component is still looked for.
+        /// </summary>
+        private static List<GameObject> CowboyHats(GameObject npc)
+        {
+            var found = new List<GameObject>();
+            foreach (var a in npc.GetComponentsInChildren<Accessory>(true))
+                if (IsCowboy(a)) found.Add(a.gameObject);
+            foreach (var o in npc.GetComponentsInChildren<AvatarObject>(true))
+            {
+                if (o == null || found.Contains(o.gameObject)) continue;
+                string id = null;
+                try { id = o.Id; } catch { }
+                if (Has(id, "cowboy") || Has(o.gameObject.name, "cowboy")) found.Add(o.gameObject);
+            }
+            foreach (var at in npc.GetComponentsInChildren<AvatarAttachment>(true))
+            {
+                AvatarObject parent = null;
+                try { parent = at?.Parent; } catch { }
+                if (parent != null && found.Contains(parent.gameObject) && !found.Contains(at.gameObject)) found.Add(at.gameObject);
+            }
+            return found;
+        }
+
+        private static List<string> WornNames(GameObject npc)
+        {
+            var names = new List<string>();
+            foreach (var o in npc.GetComponentsInChildren<AvatarObject>(true))
+            {
+                if (o == null) continue;
+                string id = null;
+                try { id = o.Id; } catch { }
+                names.Add((id ?? "?") + "/" + o.gameObject.name);
+            }
+            return names;
+        }
+
         private static bool Has(string s, string part) => s != null && s.IndexOf(part, StringComparison.OrdinalIgnoreCase) >= 0;
 
         /// <summary>Shows or hides the cowboy hat's renderers; false when there's no cowboy hat to be found.</summary>
         private static bool HideCowboyHat(GameObject npc, bool hide)
         {
             bool found = false;
-            foreach (var a in npc.GetComponentsInChildren<Accessory>(true))
+            foreach (var a in CowboyHats(npc))
             {
-                if (!IsCowboy(a)) continue;
                 foreach (var r in a.GetComponentsInChildren<Renderer>(true))
                 {
                     found = true;
@@ -221,9 +261,8 @@ namespace Melange.Smuggling
 
         private static Material CowboyHatMaterial(GameObject npc)
         {
-            foreach (var a in npc.GetComponentsInChildren<Accessory>(true))
+            foreach (var a in CowboyHats(npc))
             {
-                if (!IsCowboy(a)) continue;
                 foreach (var r in a.GetComponentsInChildren<Renderer>(true))
                     if (r.sharedMaterial != null) return r.sharedMaterial;
             }
@@ -233,16 +272,15 @@ namespace Melange.Smuggling
         /// <summary>For tuning the fit in game: where the cowboy hat's renderers say it is.</summary>
         private static string CowboyBounds(GameObject npc)
         {
-            foreach (var a in npc.GetComponentsInChildren<Accessory>(true))
+            foreach (var a in CowboyHats(npc))
             {
-                if (!IsCowboy(a)) continue;
                 foreach (var r in a.GetComponentsInChildren<Renderer>(true))
                 {
                     var b = r.bounds;
                     return $"; cowboy hat bounds centre {b.center}, size {b.size}, shader {(r.sharedMaterial != null && r.sharedMaterial.shader != null ? r.sharedMaterial.shader.name : "none")}";
                 }
             }
-            return "; no cowboy hat found";
+            return "; no cowboy hat found among avatar objects [" + string.Join(", ", WornNames(npc)) + "]";
         }
     }
 }
