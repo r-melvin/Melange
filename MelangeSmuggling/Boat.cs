@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using S1API.Interaction;
 using UnityEngine;
 
@@ -21,8 +20,6 @@ namespace Melange.Smuggling
         private static Vector3 _berth;
         private static Quaternion _heading;
         private static object _sailing;
-        private static MeshFile _file;
-        private static bool _fileRead;
 
         public static bool Placed => _root != null;
         public static Vector3 Position => _berth;
@@ -78,7 +75,7 @@ namespace Melange.Smuggling
             if (_root == null) return "not placed";
             var p = _root.transform.position;
             return $"berth ({_berth.x:0.0},{_berth.y:0.00},{_berth.z:0.0}), now at ({p.x:0.0},{p.y:0.00},{p.z:0.0}), shown {_root.activeSelf}, " +
-                   $"model {(_file != null ? "loaded" : "stand-in")}, prompt {(_interaction != null ? "on" : "off")}, sailing {_sailing != null}";
+                   $"model {(Models.Has(Resource) ? "loaded" : "stand-in")}, prompt {(_interaction != null ? "on" : "off")}, sailing {_sailing != null}";
         }
 
         public static void SetMessage(string text)
@@ -164,81 +161,23 @@ namespace Melange.Smuggling
 
         // ---- the model ----
 
-        private sealed class MeshFile { public float[] size { get; set; } public Part[] parts { get; set; } }
-        private sealed class Part { public float[] color { get; set; } public bool metal { get; set; } public float[] v { get; set; } public float[] n { get; set; } public int[] t { get; set; } }
-
-        private static MeshFile Load()
-        {
-            if (_fileRead) return _file;
-            _fileRead = true;
-            try
-            {
-                using var stream = typeof(Boat).Assembly.GetManifestResourceStream(Resource);
-                _file = stream == null ? null : System.Text.Json.JsonSerializer.Deserialize<MeshFile>(stream);
-            }
-            catch (Exception e) { Mod.Log.Warning($"could not read {Resource}: {e.Message}"); _file = null; }
-            return _file;
-        }
-
         /// <summary>
-        /// The speedboat from the shared Blender pipeline: one part per colour, Unity axes, origin on the waterline
-        /// midships, bow along +Z. Materials are copies of a lit material already in the scene (a fresh material can
-        /// render pink under this pipeline). Without the model or a material, a plain box stands in so the berth still works.
+        /// The speedboat from the shared Blender pipeline (<see cref="Models"/>): origin on the waterline midships, bow along
+        /// +Z. Without the model or a material, a plain box stands in so the berth still works.
         /// </summary>
         private static GameObject BuildModel(Transform parent)
         {
+            var built = Models.Build(Resource, parent, "model");
+            if (built != null) return built;
+            Mod.Log.Warning($"boat model {(Models.Has(Resource) ? "has no material to copy" : "missing")}; a stand-in box is used");
             var model = new GameObject("model");
             model.transform.SetParent(parent, false);
-            var file = Load();
-            var template = LitTemplate();
-            if (file?.parts == null || template == null)
-            {
-                Mod.Log.Warning($"boat model {(file == null ? "missing" : "has no material to copy")}; a stand-in box is used");
-                var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                UnityEngine.Object.Destroy(box.GetComponent<Collider>());
-                box.transform.SetParent(model.transform, false);
-                box.transform.localScale = new Vector3(2.3f, 1f, 7f);
-                box.transform.localPosition = new Vector3(0f, 0.3f, 0f);
-                return model;
-            }
-            foreach (var p in file.parts)
-            {
-                if (p?.v == null || p.n == null || p.t == null || p.color == null) continue;
-                int nv = p.v.Length / 3;
-                var verts = new Vector3[nv]; var norms = new Vector3[nv];
-                for (int i = 0; i < nv; i++) { verts[i] = new Vector3(p.v[3 * i], p.v[3 * i + 1], p.v[3 * i + 2]); norms[i] = new Vector3(p.n[3 * i], p.n[3 * i + 1], p.n[3 * i + 2]); }
-                var mesh = new Mesh();
-                mesh.vertices = verts; mesh.normals = norms; mesh.triangles = p.t;
-                mesh.RecalculateBounds();
-                var go = new GameObject("part");
-                go.transform.SetParent(model.transform, false);
-                go.AddComponent<MeshFilter>().sharedMesh = mesh;
-                var mat = new Material(template);
-                var c = new Color(p.color[0], p.color[1], p.color[2]);
-                if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", c);
-                if (mat.HasProperty("_Color")) mat.SetColor("_Color", c);
-                if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", null);
-                if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", null);
-                if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", p.metal ? 0.8f : 0f);
-                go.AddComponent<MeshRenderer>().sharedMaterial = mat;
-            }
+            var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            UnityEngine.Object.Destroy(box.GetComponent<Collider>());
+            box.transform.SetParent(model.transform, false);
+            box.transform.localScale = new Vector3(2.3f, 1f, 7f);
+            box.transform.localPosition = new Vector3(0f, 0.3f, 0f);
             return model;
-        }
-
-        /// <summary>A material on the URP Lit shader, taken from something already loaded, to copy for the boat's colours.</summary>
-        private static Material LitTemplate()
-        {
-            try
-            {
-                foreach (var mat in Resources.FindObjectsOfTypeAll<Material>())
-                {
-                    if (mat == null || mat.shader == null) continue;
-                    string n = mat.shader.name;
-                    if (n == "Universal Render Pipeline/Lit" || n == "Universal Render Pipeline/Simple Lit") return mat;
-                }
-            }
-            catch (Exception e) { Mod.Log.Warning("no lit material found: " + e.Message); }
-            return null;
         }
     }
 }

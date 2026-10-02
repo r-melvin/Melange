@@ -16,6 +16,9 @@ namespace Melange.Smuggling
         private static MelonPreferences_Entry<float> _methPrice;
         private static MelonPreferences_Entry<bool> _tanker;
         private static MelonPreferences_Entry<string> _tankerVehicle;
+        private static MelonPreferences_Entry<bool> _pirate;
+        private static MelonPreferences_Entry<float> _hatScale;
+        private static MelonPreferences_Entry<string> _hatOffset, _patchOffset;
 
         public static void Create()
         {
@@ -41,6 +44,10 @@ namespace Melange.Smuggling
             _tanker = c.CreateEntry("TankerJob", false, "Experimental: the methylamine tanker job", "Off by default and unproven in game. Needs MethylamineItemId.");
             _tankerVehicle = c.CreateEntry("TankerVehicle", "veeper", "Experimental: the tanker's vehicle code");
             _tankerUnits = c.CreateEntry("TankerMethylamine", 40, "Experimental: methylamine in a stopped tanker");
+            _pirate = c.CreateEntry("PirateLook", true, "Dafydd wears a tricorn and an eyepatch", "Off: the black cowboy hat, no eyepatch.");
+            _hatScale = c.CreateEntry("PirateHatScale", 1f, "Tricorn size", "A multiple of the size fitted to his head (1 = as fitted).");
+            _hatOffset = c.CreateEntry("PirateHatOffset", "", "Tricorn nudge", "\"x,y,z\" metres (right, up, forward from his view) added to where the hat sits. Empty = none.");
+            _patchOffset = c.CreateEntry("PirateEyepatchOffset", "", "Eyepatch nudge", "\"x,y,z\" metres (right, up, forward). Empty = none.");
         }
 
         public static SmugglingRules Rules()
@@ -72,5 +79,9 @@ namespace Melange.Smuggling
         public static bool Tanker => _tanker?.Value ?? false;
         public static string TankerVehicle => string.IsNullOrWhiteSpace(_tankerVehicle?.Value) ? "veeper" : _tankerVehicle.Value.Trim();
         public static int TankerMethylamine => _tankerUnits?.Value ?? 40;
+        public static bool PirateLook => _pirate?.Value ?? true;
+        public static double PirateHatScale => PirateFit.UserScale(_hatScale?.Value ?? 1f);
+        public static (double X, double Y, double Z) PirateHatOffset => PirateFit.ParseOffset(_hatOffset?.Value);
+        public static (double X, double Y, double Z) PirateEyepatchOffset => PirateFit.ParseOffset(_patchOffset?.Value);
     }
 }

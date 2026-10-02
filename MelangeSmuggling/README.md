@@ -1,7 +1,7 @@
 # Melange Smuggling
 
 Turnip Night's speedboat. Spend big at Oscar's and he puts you in touch with his supplier: Dafydd "Turnip Night"
-Seabiscuit, a Welshman in a pirate's get-up who runs a speedboat out of the Docks. He takes huge bulk orders, sails at
+Seabiscuit, a Welshman in a pirate's get-up (tricorn, eyepatch, curls and a burgundy coat) who runs a speedboat out of the Docks. He takes huge bulk orders, sails at
 night whether you've delivered or not, and brings goods back on the return leg.
 
 **Needs:** MelonLoader 0.7.x, [S1API](https://github.com/ifBars/S1API), and Melange Core 0.2 or newer (in `Mods/`).
@@ -35,7 +35,9 @@ night whether you've delivered or not, and brings goods back on the return leg.
 In `UserData/MelonPreferences.cfg`, section `MelangeSmuggling`: the purchase range and the $300 floor, order, departure
 and return times, days of grace before the deadline, days between orders, the price premium, police risk (and the
 route's multiplier), the import catalogue (`id:crate:price`), the methylamine item, which gap between the quay's
-bollards the boat uses, and the boat's waterline if it sits wrong. Changes apply from the next load. In co-op the
+bollards the boat uses, and the boat's waterline if it sits wrong. `PirateLook` (off: Dafydd wears a black cowboy hat
+instead of the tricorn and eyepatch), and `PirateHatScale`, `PirateHatOffset`, `PirateEyepatchOffset` to nudge them if
+they sit wrong on his head. Changes apply from the next load. In co-op the
 host's settings and the host's game decide everything; other players see the boat and Dafydd and get his texts.
 
 **Experimental (off by default):** `TankerJob` adds a methylamine tanker that leaves Billy's chemical plant now and

@@ -12,9 +12,10 @@ namespace Melange.Smuggling
 {
     /// <summary>
     /// Dafydd "Turnip Night" Seabiscuit: the smuggler, an S1API custom NPC who stands on the Docks quay by his boat and
-    /// texts the player orders. Dressed as near to a pirate as the game's wardrobe gets: a black wide-brimmed hat for a
-    /// tricorn, long black curls, a twirled moustache, a white shirt under a burgundy coat, a belt, boots, a gold chain
-    /// and a tattooed arm. (The game has no eyepatch; a model of one would need the hub's accessory pipeline.)
+    /// texts the player orders. Dressed as a pirate: long black curls, a twirled moustache, a white shirt under a burgundy
+    /// coat, a belt, boots, a gold chain and a tattooed arm from the game's wardrobe, and a tricorn and an eyepatch of our own
+    /// on his head bone (<see cref="Pirate"/>). The game has neither, so his appearance keeps a black cowboy hat, which shows
+    /// if the tricorn can't be put on.
     /// </summary>
     public sealed class Dafydd : NPC
     {
@@ -27,6 +28,7 @@ namespace Melange.Smuggling
         internal static Dafydd Instance { get; private set; }
 
         private bool _wired;
+        private readonly Pirate _pirate = new Pirate();
 
         /// <summary>Leaving a save: the NPC goes with the scene, and the next load makes a new one.</summary>
         internal static void Forget() => Instance = null;
@@ -52,6 +54,24 @@ namespace Melange.Smuggling
             _wired = false;
             try { Appearance.Build(); } catch (Exception e) { Mod.Log.Warning("Dafydd's look: " + e.Message); }
             try { Schedule.Enable(); } catch (Exception e) { Mod.Log.Warning("Dafydd's schedule: " + e.Message); }
+            MelonLoader.MelonCoroutines.Start(KeepDressed());
+        }
+
+        /// <summary>
+        /// Every couple of seconds while he exists (on every peer): the tricorn and eyepatch go on once his avatar has a head,
+        /// and the cowboy hat stays hidden under the tricorn.
+        /// </summary>
+        private System.Collections.IEnumerator KeepDressed()
+        {
+            while (Instance == this)
+            {
+                GameObject go = null;
+                try { go = gameObject; } catch { }
+                if (go == null) yield break;
+                _pirate.Dress(go);
+                float until = Time.realtimeSinceStartup + 2f;
+                while (Time.realtimeSinceStartup < until) yield return null;
+            }
         }
 
         /// <summary>
@@ -93,7 +113,7 @@ namespace Melange.Smuggling
             av.WithBodyLayer(Shirts.Buttonup, new Color(0.95f, 0.93f, 0.86f));
             av.WithBodyLayer(Pants.CargoPants, new Color(0.18f, 0.13f, 0.09f));
             av.WithBodyLayer(RightArmTattoos.Heart, new Color(0.1f, 0.15f, 0.35f));
-            av.WithAccessoryLayer(Head.CowboyHat, new Color(0.07f, 0.07f, 0.07f));
+            av.WithAccessoryLayer(Head.CowboyHat, new Color(0.07f, 0.07f, 0.07f));   // hidden under the tricorn (Pirate), the fallback
             av.WithAccessoryLayer(Chest.CollarJacket, new Color(0.45f, 0.06f, 0.1f));
             av.WithAccessoryLayer(Waist.Belt, new Color(0.15f, 0.1f, 0.05f));
             av.WithAccessoryLayer(Feet.CombatBoots, new Color(0.1f, 0.08f, 0.06f));

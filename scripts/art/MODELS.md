@@ -22,6 +22,8 @@ Run any of them headless:
 | toad | build_toad.py | psychedelics | n/a (terrarium item) | 0.19 x 0.08 x 0.17 | 1784 | under the toad, on the surface its feet touch |
 | ergot_colony | build_ergot.py | psychedelics | n/a (sits in a mushroom bed) | 0.65 x 0.51 x 0.42 | 1644 | bottom centre, on the bed's soil |
 | blotter_frame | build_ergot.py | psychedelics | 2 x 1 | 0.66 x 1.54 x 0.49 | 352 | bottom centre, floor |
+| tricorn | build_pirate.py | smuggling | n/a (NPC head) | 0.41 x 0.15 x 0.40 | 1468 | centre of the crown opening (the hat's inner rim) |
+| eyepatch | build_pirate.py | smuggling | n/a (NPC head) | 0.20 x 0.07 x 0.22 | 512 | bridge of the nose at eye height, on the face surface |
 
 ## Attachment points (Unity axes, metres from the model's origin)
 
@@ -35,6 +37,10 @@ Run any of them headless:
 - **pump hose spigot** tip: about (0.10, 0.16, 0.19), pointing +Z (front).
 - **blotter_frame sheet** (for the SpraySurface): centre (0, 0.956, 0.105), 0.60 x 0.40 m (3:2, like the 450 x 300
   canvas), normal (0, 0.139, 0.990) (leaning back 8 degrees).
+- **tricorn / eyepatch** are drawn for eyes 0.066 m apart (the eyepatch's patch is centred at x = -0.033, the wearer's
+  left eye, front face at z = +0.009); the mod scales both by the wearer's real eye spacing. The eyepatch strap is
+  snapped to a 0.19 x 0.23 x 0.21 m ellipsoid head centred 0.095 m behind the origin, so on a differently shaped head it
+  may float or clip. The tricorn's gold braid is `metal`.
 - **terrarium**: the sand top (where toads sit) is 0.83 m up; interior about 0.86 x 0.41 m.
 
 ## Notes

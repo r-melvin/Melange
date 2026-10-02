@@ -11,12 +11,16 @@
   <ItemGroup>
     <Reference Include="S1API.Il2Cpp.MelonLoader"><HintPath>$(S1ApiDll)</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(Interop)/UnityEngine.PhysicsModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.AnimationModule"><HintPath>$(Interop)/UnityEngine.AnimationModule.dll</HintPath><Private>false</Private></Reference>
     <ProjectReference Include="../MelangeCore/MelangeCore.csproj" Private="false" />
   </ItemGroup>
   <ItemGroup>
     <!-- Turnip Night's speedboat, built by scripts/art/build_speedboat.py (Blender) and copied into Art/ (committed, so
          every build has it; scripts/art/out is generated and ignored). Without it the boat is a plain stand-in box. -->
     <EmbeddedResource Include="Art/speedboat.mesh.json" LogicalName="MelangeSmuggling.speedboat.mesh.json" />
+    <!-- Dafydd's tricorn and eyepatch, built by scripts/art/build_pirate.py. Without them he keeps the cowboy hat. -->
+    <EmbeddedResource Include="Art/tricorn.mesh.json" LogicalName="MelangeSmuggling.tricorn.mesh.json" />
+    <EmbeddedResource Include="Art/eyepatch.mesh.json" LogicalName="MelangeSmuggling.eyepatch.mesh.json" />
     <None Remove="Art/**" />
   </ItemGroup>
 </Project>

@@ -41,7 +41,9 @@ The game's own console commands used below: `give <item> <qty>`, `settime <hhmm>
 - Log: `boat berth (x, y, z) heading <deg>, quay top <y>, waterline from ...`, plus any `water candidate <name> at y <y>`
   lines. Record all of them: they settle where the water is (assumption A5).
 - No warnings starting `Oscar's shop wasn't found`, `boat model`, `boat prompt not added`, `Dafydd's look`,
-  `Dafydd's dialogue`, `import <id>: no such item`.
+  `Dafydd's dialogue`, `import <id>: no such item`, `Dafydd's pirate look`, `Dafydd's tricorn`, `Dafydd's eyepatch`.
+- Log, once he spawns: `Dafydd dressed: head bone '<name>', fitted to his eyes, eye spacing <s> m (scale <k>), tricorn on,
+  eyepatch on; cowboy hat bounds centre (...), size (...), shader <name>`. Record the whole line (P4b uses it).
 - `smuggling status` says `Dafydd spawned`. If it says `missing`, check S1API's log for the NPC (assumption A8).
 
 ### P2. Reset between saves
@@ -61,15 +63,34 @@ The game's own console commands used below: `give <item> <qty>`, `settime <hhmm>
 
 ### P4. Dafydd and the boat on the quay
 - Setup: P3 done. `teleport` to the Docks quay, between the third and fourth bollards (about -70, -34).
-- Expected: Dafydd stands on the quay in a black wide-brimmed hat, long black curls, twirled moustache, white shirt,
-  burgundy jacket, belt, dark trousers, boots, gold chain. Record a screenshot; check nothing failed to load (bald,
-  missing jacket) against the S1API log (assumption A9).
+- Expected: Dafydd stands on the quay in a black tricorn with gold trim (a small white badge on the front point) and a
+  black eyepatch, long black curls, twirled moustache, white shirt, burgundy jacket, belt, dark trousers, boots, gold
+  chain. No black cowboy hat. Record a screenshot; check nothing failed to load (bald, missing jacket) against the S1API
+  log (assumption A9). P4b covers the hat and eyepatch in detail.
 - The boat lies in the water beside the quay, parallel to it, bow towards the next bollard (south-east). Record whether
   it floats at the waterline, sits in the air or is sunk (A5), whether it is on the water side at all (A4), and whether
   the colours render (pink means the material template failed: A6).
 - The prompt on the quay edge beside the boat reads `Turnip Night's boat (no order on)` (or `Somebody's speedboat`
   before unlocking). Record the reach (A7).
 - After midnight and again at noon he is still there (his schedule walks him back).
+
+### P4b. The tricorn and eyepatch
+- Setup: P4. Walk round him close up, and watch him walk back to his spot (`settime 0000`) so the head moves.
+- The tricorn sits level on his head, front point forward, crown over the top of his head, brim clear of his face, and
+  moves with his head. Record: floating above or sunk into the head, off-centre, too big or small, hair poking through
+  the crown (long curls under it), and the colours (black felt, gold trim: pink or white means the material copy failed;
+  too dark means `Models.Tinted` needs lighter colours for that shader).
+- The eyepatch covers one eye (his left), the strap runs round the head over the right ear. Record whether the strap
+  floats off or sinks into the head (it is drawn for an ellipsoid head, A18), and whether the patch sits in front of the
+  eyeball or inside it.
+- If anything sits wrong, tune `PirateHatScale`, `PirateHatOffset` / `PirateEyepatchOffset` ("x,y,z" metres: right, up,
+  forward from his view), reload, and record the values that fit; they should become the defaults in `Logic/PirateFit.cs`.
+- No cowboy hat shows at any distance, including after walking away and back (the game's culling toggles his renderers;
+  the hat is hidden with `forceRenderingOff`, which culling doesn't touch).
+- `PirateLook = false`, reload: the black cowboy hat is back and no eyepatch.
+- Fallback: if the log says `the cowboy hat wasn't found to hide`, `no head to put it on` or `model missing`, he keeps
+  the cowboy hat and no tricorn (never both hats).
+- Co-op client: he wears the tricorn and eyepatch on the client too (every peer dresses its own copy).
 
 ### P5. An order
 - Setup: P3 done. Wait for 08:00 the morning after unlocking, or `smuggling order`.
@@ -165,7 +186,7 @@ The game's own console commands used below: `give <item> <qty>`, `settime <hhmm>
   loaded (the spoke wires him whenever he appears). His texts before he spawns are not sent (only the first text is
   retried).
 - **A9** The clothing paths (S1API's appearance constants) all exist in 0.4.7f7. The game has no eyepatch or tricorn;
-  the cowboy hat in black stands in.
+  the black cowboy hat stays in his appearance as the fallback and is hidden under our tricorn.
 - **A10** S1API restores text replies on load and calls `OnResponseLoaded`, where the order buttons are re-attached by
   label (`msm_accept_<id>`, `msm_decline_<id>`); an old order's buttons do nothing.
 - **A11** The default import item IDs `acid`, `phosphorus`, `highqualitypseudo` exist. An unknown ID is left out with
@@ -187,6 +208,16 @@ The game's own console commands used below: `give <item> <qty>`, `settime <hhmm>
   Response Overhaul) is a later choice.
 - **A17** The clock: `TimeManager.GetTotalMinSum()` is `ElapsedDays * 1440 + minutes since midnight`, and stands still at
   04:00 until the player sleeps; every step compares "has it passed", so sleeping through a departure sails it on waking.
+
+- **A18** Dafydd's tricorn and eyepatch (`Pirate.cs`, models from `scripts/art/build_pirate.py`): his head bone is the
+  humanoid animator's `HumanBodyBones.Head` (via `Avatar.Animation._animator`, else any Animator, else a transform named
+  `Head`); his eyes are `Avatar.Eyes.LeftEye/RightEye`, measured by their eyeball renderers' bounds. The models are scaled
+  by his eye spacing (drawn for 0.066 m) and placed in his level facing frame from the point between his eyes: the hat's
+  rim 1.1 eye spacings up and 1.35 back, the patch one eyeball radius in front. Those ratios are guesses at a human head,
+  not measured on the game's avatar. The cowboy hat is found as the `Accessory` whose asset path or name contains
+  "Cowboy"; its renderers are hidden but the accessory stays, so any hair blocking it does still applies. Materials are
+  copies of the cowboy hat's own material (else a URP Lit material in the scene), flat-coloured with textures cleared; an
+  avatar shader may not take `_BaseColor`/`_Color` the way URP Lit does.
 
 ## Not in this version
 
