@@ -6,7 +6,7 @@ share is compiled into each of them, never shipped as a separate library.
 
 | Mod | What it does | Status |
 |---|---|---|
-| [Paper Trail](PaperTrail/) | Rolling auto-saves every 2 in-game hours at a safe moment, a snapshot of every save, and a save/load screen from the main menu and pause menu. | 0.2.0 |
+| [Paper Trail](PaperTrail/) | Rolling auto-saves every 2 in-game hours at a safe moment, a snapshot of every save, and a save/load screen from the main menu and pause menu. | 0.3.0 |
 
 Looking for the fixes for other people's mods? Those are
 [Schedule I Unofficial Mod Fixes (S1UMF)](https://github.com/r-melvin/S1UMF).
@@ -19,10 +19,15 @@ A rolling auto-save and a save manager that looks and feels like part of the gam
   the game is saving.
 - **Key-moment saves** when a quest is completed, a dealer is recruited, a property or business is bought, you
   rank up, the cartel situation changes, or a new area or supplier is unlocked. (Customer unlocked is off by default.)
-- **Save and load screens** from main-menu *Continue*, the pause menu's *Save* and *Load* buttons and the safehouse
-  *Intercom Save Point*. Saving offers Save, Overwrite, Rename, Pin and Delete; loading offers Load, Rename, Pin and
-  Delete, for any campaign (`<` and `>` switch between them, in a game too). Escape closes them, as it does the game's
-  own menus. Built from the game's own panels and buttons.
+- **Main menu:** *Continue* loads your last played save straight away; *Load Game*, below it, opens the load screen.
+- **Save and load screens** from the main menu's *Load Game*, the pause menu's *Save* and *Load* buttons and the
+  safehouse *Intercom Save Point*. Saving offers Save, Overwrite, Rename, Pin and Delete; loading offers Load, Rename,
+  Pin and Delete, for any campaign (`<` and `>` switch between them, in a game too), and at the main menu the game's
+  own *Import* and *Export* of a slot. Escape closes them, as it does the game's own menus. Built from the game's own
+  panels and buttons.
+- **Archived campaigns:** when a new game or an import replaces a campaign in its slot, that campaign's saves are
+  archived instead of mixed into the new one's. Archived campaigns appear on the load screen after the slots; loading
+  one puts it back in its slot and archives whatever was there, so nothing is lost.
   Holding **Shift** while the game starts skips "continue last game on start-up".
 - **Follows the game's 60-second save wait** after a save-point save or a load.
 - **Safeguards:** a copy is kept before a save is loaded into a newer game version or with a changed mod list.
@@ -39,9 +44,9 @@ manual-save limit (default 30), safeguard copies kept, and cloud sync.
 ### Your snapshots without the mod
 
 Every snapshot is a standard zip in the game's own export layout (`SaveGame_N/...`), so removing Paper Trail
-loses nothing. Snapshots are in `UserData/PaperTrail/Snapshots/Slot_N/<snapshot>/save.zip` (and mirrored in
-`Saves/<SteamID>/PaperTrail/`). To use one, open the game's *Continue* screen and use **Import** on the zip, or
-unzip it over the save folder yourself.
+loses nothing. Snapshots are in `UserData/PaperTrail/Snapshots/Slot_N/<snapshot>/save.zip`, archived campaigns' in
+`Snapshots/Archive/<date>-slot<N>-<organisation>/` (all mirrored in `Saves/<SteamID>/PaperTrail/`). To use one, use
+**Import** on the zip from the game's save slot screen, or unzip it over the save folder yourself.
 
 ### Installing
 

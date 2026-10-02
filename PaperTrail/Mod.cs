@@ -17,7 +17,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.Events;
 
-[assembly: MelonInfo(typeof(PaperTrail.Mod), "Paper Trail", "0.2.0", "r-melvin")]
+[assembly: MelonInfo(typeof(PaperTrail.Mod), "Paper Trail", "0.3.0", "r-melvin")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace PaperTrail
@@ -141,14 +141,7 @@ namespace PaperTrail
                 if (snapshot != null)
                 {
                     SnapshotInfo keep = null;
-                    if (!Store.SlotIsKept(slot))
-                        keep = new SnapshotInfo
-                        {
-                            Location = "Last save",
-                            PlaySeconds = Store.Campaign(slot).PlaySeconds,
-                            Organisation = snapshot.Organisation,
-                            GameVersion = Application.version,
-                        };
+                    if (!Store.SlotIsKept(slot)) keep = DescribeSlotAsSaved(slot, snapshot);
                     Store.Restore(slot, snapshot, keep);
                     var campaign = Store.Campaign(slot);
                     campaign.PlaySeconds = snapshot.PlaySeconds;      // play time goes back with the save
@@ -194,6 +187,80 @@ namespace PaperTrail
         /// Before a campaign is loaded by a newer game or a different set of mods, keeps what is on disk - the one
         /// moment a save's contents can change under it. Nothing is kept when the slot already matches a snapshot.
         /// </summary>
+        /// <summary>
+        /// Loads a snapshot of an archived campaign: it goes back into the slot it was played in. The slot's current
+        /// save is kept first as the last save of the slot's current history, and that history is archived in turn,
+        /// so nothing is lost and the two campaigns' saves never mix.
+        /// </summary>
+        public static void LoadArchived(string archive, int slot, SnapshotInfo snapshot, bool fromGame)
+        {
+            try
+            {
+                lock (Work.Disk)
+                {
+                    var info = LoadManager.SaveGames != null && slot - 1 < LoadManager.SaveGames.Length ? LoadManager.SaveGames[slot - 1] : null;
+                    if (info != null && Directory.Exists(Store.GameSlotFolder(slot)))
+                    {
+                        var keep = DescribeSlotAsSaved(slot, snapshot);
+                        keep.Organisation = info.OrganisationName ?? "";
+                        keep.Kind = SaveKind.BeforeRestore;
+                        keep.Pinned = true;
+                        keep.Note = $"Kept before loading the archived campaign {snapshot.Organisation}";
+                        Store.Take(slot, keep);
+                    }
+                    Store.Unarchive(archive, slot);
+                    // The snapshot moved with its campaign's folder: restore it from where it is now.
+                    snapshot.Folder = Path.Combine(Store.SlotFolder(slot), Path.GetFileName(snapshot.Folder));
+                    Store.Restore(slot, snapshot, null);
+                    var campaign = Store.Campaign(slot);
+                    campaign.PlaySeconds = snapshot.PlaySeconds;
+                    Store.SaveCampaign(slot, campaign);
+                }
+                Log.Msg($"brought back archived campaign {snapshot.Organisation} into slot {slot}: {Store.Describe(snapshot)}");
+            }
+            catch (Exception e)
+            {
+                Log.Error("could not bring back the archived campaign: " + e);
+                SaveScreen.ShowFailure("The archived campaign could not be loaded; see the log. Nothing was deleted.");
+                return;
+            }
+            LoadNow(slot, null, fromGame);
+        }
+
+        /// <summary>
+        /// The details of a slot as it is on disk, for the copy kept before a snapshot replaces it: those of the
+        /// snapshot it still matches (place, day, money), or the game's own save info when none does.
+        /// </summary>
+        private static SnapshotInfo DescribeSlotAsSaved(int slot, SnapshotInfo replacing)
+        {
+            var keep = new SnapshotInfo
+            {
+                Location = "Last save",
+                PlaySeconds = Store.Campaign(slot).PlaySeconds,
+                Organisation = replacing.Organisation,
+                GameVersion = Application.version,
+            };
+            // The copy is of the save in the slot now, so it carries that save's organisation, not the one replacing it.
+            try { var now = LoadManager.SaveGames[slot - 1]?.OrganisationName; if (!string.IsNullOrEmpty(now)) keep.Organisation = now; } catch { }
+            var same = Store.List(slot).Take(5).FirstOrDefault(s => Store.SlotMatches(slot, s));
+            if (same != null)
+            {
+                keep.Location = same.Location;
+                keep.GameDay = same.GameDay;
+                keep.GameTime = same.GameTime;
+                keep.NetWorth = same.NetWorth;
+                keep.Cash = same.Cash;
+                keep.Online = same.Online;
+                keep.Rank = same.Rank;
+                keep.PlaySeconds = same.PlaySeconds;
+            }
+            else
+            {
+                try { keep.NetWorth = LoadManager.SaveGames[slot - 1]?.Networth ?? 0f; } catch { }
+            }
+            return keep;
+        }
+
         private static void Safeguard(int slot)
         {
             try
@@ -319,7 +386,9 @@ namespace PaperTrail
                 _slot = -1;
                 return;
             }
-            _campaign = Store.Campaign(_slot);
+            // A new game or an import in this slot moves the previous campaign's history to the archive.
+            try { _campaign = Store.Claim(_slot, lm.ActiveSaveInfo.OrganisationName ?? "", lm.ActiveSaveInfo.DateCreated.Ticks); }
+            catch (Exception e) { Log.Warning("could not check the slot's campaign: " + e.Message); _campaign = Store.Campaign(_slot); }
             _campaign.Mods = CurrentMods();
             _enteredAt = Time.realtimeSinceStartup;
             _switching = false;

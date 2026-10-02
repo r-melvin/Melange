@@ -6,6 +6,7 @@ using Il2CppScheduleOne.DevUtilities;
 using Il2CppScheduleOne.Persistence;
 using Il2CppScheduleOne.PlayerScripts;
 using Il2CppScheduleOne.UI;
+using Il2CppScheduleOne.UI.Input;
 using Il2CppScheduleOne.UI.MainMenu;
 using Il2CppTMPro;
 using UnityEngine;
@@ -45,11 +46,13 @@ namespace PaperTrail
         private static float _openedAt;
         private static Mode _mode;
         private static int _slot;
+        private static string _archive;          // an archived campaign's folder while one is on show; null for a slot
         private static readonly List<Entry> Entries = new List<Entry>();
         private static int _selected = -1;
         private static RectTransform _content;
         private static TextMeshProUGUI _title, _campaign, _status;
-        private static SmallBtn _load, _save, _overwrite, _rename, _pin, _delete, _prevCampaign, _nextCampaign;
+        private static SmallBtn _load, _save, _overwrite, _rename, _pin, _delete, _export, _import, _prevCampaign, _nextCampaign;
+        private static RectTransform _prevArrow, _nextArrow;
         private static GameObject _modal;
         private static RectTransform _listPage, _dialogPage;
         private static ScrollRect _scroll;
@@ -137,12 +140,14 @@ namespace PaperTrail
             int playing = Mod.Instance.CurrentSlot;
             if (mode == Mode.Save && playing <= 0) return;
             _slot = playing > 0 ? playing : DefaultSlot();
+            _archive = null;
             if (Ui.Font == null) Ui.FindFont();
 
             // At the main menu the game's own screen steps aside, as when it opens one of its own.
             if (playing <= 0)
                 try { _hiddenMenuScreen = MenuScreen.Current; if (_hiddenMenuScreen != null) _hiddenMenuScreen.Close(); }
                 catch { _hiddenMenuScreen = null; }
+            ShowMenuPrompts();
 
             ForgetWidgets();            // a screen the game destroyed with its scene never got to CloseIfOpen
             Build();
@@ -162,7 +167,8 @@ namespace PaperTrail
             _group = null;
             _content = null;
             _title = _campaign = _status = null;
-            _load = _save = _overwrite = _rename = _pin = _delete = _prevCampaign = _nextCampaign = null;
+            _load = _save = _overwrite = _rename = _pin = _delete = _export = _import = _prevCampaign = _nextCampaign = null;
+            _prevArrow = _nextArrow = null;
             _listPage = _dialogPage = null;
             _scroll = null;
             _viewport = null;
@@ -185,11 +191,43 @@ namespace PaperTrail
             ForgetWidgets();
             Entries.Clear();
             _saving = false;
+            HideMenuPrompts();
             if (_hiddenMenuScreen != null)
             {
                 try { _hiddenMenuScreen.Open(); } catch { }
                 _hiddenMenuScreen = null;
             }
+        }
+
+        private static InputPromptsData _menuPrompts;
+
+        /// <summary>
+        /// At the main menu, the game's Continue screen's prompts ("Escape  Back"), which the game shows only while one of
+        /// its own screens is open. In a game the pause menu's own prompts are still showing.
+        /// </summary>
+        private static void ShowMenuPrompts()
+        {
+            try
+            {
+                if (Mod.Instance.CurrentSlot > 0) return;
+                // The game's Continue screen, which this one stands in for (the home screen it replaces has no Back).
+                var continueScreen = Object.FindObjectOfType<ContinueScreen>(true);
+                _menuPrompts = continueScreen?.State?._defaultInputPrompts ?? _hiddenMenuScreen?.State?._defaultInputPrompts;
+                if (_menuPrompts != null && Singleton<InputPromptsManager>.InstanceExists)
+                    Singleton<InputPromptsManager>.Instance.LoadModule(_menuPrompts, EInputPromptPosition.BottomLeftMenu);
+            }
+            catch (Exception e) { Mod.Log.Warning("save screen: menu prompts: " + e.Message); _menuPrompts = null; }
+        }
+
+        private static void HideMenuPrompts()
+        {
+            try
+            {
+                if (_menuPrompts != null && Singleton<InputPromptsManager>.InstanceExists)
+                    Singleton<InputPromptsManager>.Instance.UnloadModule(_menuPrompts);
+            }
+            catch { }
+            _menuPrompts = null;
         }
 
         private static void OnExit(ExitAction action)
@@ -269,6 +307,7 @@ namespace PaperTrail
         // The list's metrics: the layout below uses them, and scrolling a row into view works out where it is from them
         // (the stripped game build cannot measure it: RectTransformUtility.CalculateRelativeRectTransformBounds is gone).
         private const float RowHeight = 70f, RowSpacing = 5f, ListPadding = 6f;
+        private const int ListFade = 16;        // rows fade out over this many pixels at the list's top and bottom edge
         private const float WheelStep = RowHeight + RowSpacing;
         private const float EaseRate = 16f;               // higher is snappier; the wheel lands in about a fifth of a second
         private const int PageRows = 5;
@@ -361,9 +400,9 @@ namespace PaperTrail
             if (_content == null || _viewport == null || index < 0 || index >= Entries.Count) return;
             try
             {
-                float top = ListPadding + index * (RowHeight + RowSpacing);       // distance down from the top of the list
+                float top = ListFade + index * (RowHeight + RowSpacing);          // distance down from the top of the list
                 float bottom = top + RowHeight;
-                float view = _viewport.rect.height, margin = 8f;
+                float view = _viewport.rect.height, margin = ListFade + 2f;     // clear of the faded edge
                 float offset = _scrollTarget;
                 if (top - margin < offset) offset = top - margin;
                 else if (bottom + margin > offset + view) offset = bottom + margin - view;
@@ -390,20 +429,41 @@ namespace PaperTrail
             catch { return null; }
         }
 
+        /// <summary>The campaign on show: a slot's history, or an archived one.</summary>
+        private static List<SnapshotInfo> Snapshots() => _archive != null ? Store.List(_archive) : Store.List(_slot);
+
+        /// <summary>Every campaign the load screen steps through: the slots with saves, then the archived ones.</summary>
+        private static List<(int Slot, string Archive)> AllCampaigns()
+        {
+            var list = Campaigns().Select(slot => (slot, (string)null)).ToList();
+            if (_mode == Mode.Load) list.AddRange(Store.Archives().Select(a => (Store.Campaign(a).Slot, a)));
+            return list;
+        }
+
+        private static string ArchiveName(string archive)
+        {
+            var info = Store.Campaign(archive);
+            string name = info.Organisation.Length > 0 ? info.Organisation : Store.List(archive).FirstOrDefault()?.Organisation ?? "";
+            string from = info.Slot > 0 ? $"slot {info.Slot}" : "a slot";
+            return $"Archived - {Escape(name.Length > 0 ? name : "Campaign")}  <color=#A0A0A0>(was {from})</color>";
+        }
+
         private static string CampaignName(int slot)
         {
             var info = SaveInfoOf(slot);
             string name = info?.OrganisationName;
             if (string.IsNullOrEmpty(name)) name = Store.List(slot).FirstOrDefault()?.Organisation;
-            return $"{Escape(string.IsNullOrEmpty(name) ? "Empty slot" : name)}  <color=#A0A0A0>Slot {slot}</color>";
+            return $"Slot {slot} - {Escape(string.IsNullOrEmpty(name) ? "Empty" : name)}";
         }
 
         private static void StepCampaign(int step)
         {
-            var list = Campaigns().ToList();
+            var list = AllCampaigns();
             if (list.Count == 0) return;
-            int at = list.IndexOf(_slot);
-            _slot = list[((at < 0 ? 0 : at) + step + list.Count) % list.Count];
+            int at = _archive != null ? list.FindIndex(c => c.Archive == _archive) : list.FindIndex(c => c.Archive == null && c.Slot == _slot);
+            var next = list[((at < 0 ? 0 : at) + step + list.Count) % list.Count];
+            _slot = next.Slot;
+            _archive = next.Archive;
             _selected = -1;
             Refresh();
         }
@@ -444,8 +504,10 @@ namespace PaperTrail
 
             var camp = Ui.Place(Ui.Node("Campaign", _listPage), 0, 1, 1, 1, 60, -92, 60, 54);
             _campaign = Ui.Label(camp, "", 14, Color.white, TextAlignmentOptions.Center);
-            _prevCampaign = SmallButton(Ui.Place(Ui.Node("Prev", _listPage), 0, 1, 0, 1, 20, -86, -56, 60), "<", () => StepCampaign(-1));
-            _nextCampaign = SmallButton(Ui.Place(Ui.Node("Next", _listPage), 1, 1, 1, 1, -56, -86, 20, 60), ">", () => StepCampaign(1));
+            _prevArrow = CampaignArrow("Prev");
+            _nextArrow = CampaignArrow("Next");
+            _prevCampaign = SmallButton(_prevArrow, "<", () => StepCampaign(-1));
+            _nextCampaign = SmallButton(_nextArrow, ">", () => StepCampaign(1));
 
             _content = List(Ui.Place(Ui.Node("List", _listPage), 0, 0, 1, 1, 20, 56, 20, 100));
 
@@ -480,9 +542,44 @@ namespace PaperTrail
             _rename = Add("Rename", Rename);
             _pin = Add("Pin", TogglePin);
             _delete = Add("Delete", Delete);
+            // The game's own Export and Import of a whole slot, which its Continue screen had: at the main menu only.
+            // Import in the panel's top-left corner, Export in its top-right, apart from the actions on a save.
+            if (_mode == Mode.Load && Mod.Instance.CurrentSlot <= 0)
+            {
+                _import = SmallButton(Corner("Import", 0f), "Import", () => RunGameSlotAction(true));
+                _export = SmallButton(Corner("Export", 1f), "Export", () => RunGameSlotAction(false));
+            }
+            else _export = _import = null;
             // No Close button: Escape closes it, as it does the game's own menus (OnExit).
 
             _status = HintText(root);
+        }
+
+        /// <summary>A button-sized spot in the panel's top-left (x 0) or top-right (x 1) corner.</summary>
+        private static RectTransform Corner(string name, float x)
+        {
+            var rt = Ui.Node(name, _listPage);
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(x, 1f);
+            rt.sizeDelta = new Vector2(92, 26);
+            rt.anchoredPosition = new Vector2(x == 0f ? 24f : -24f, -24f);
+            return rt;
+        }
+
+        /// <summary>A campaign arrow, placed beside the campaign's name by <see cref="PlaceCampaignArrows"/>.</summary>
+        private static RectTransform CampaignArrow(string name)
+        {
+            var rt = Ui.Node(name, _listPage);
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.sizeDelta = new Vector2(36, 26);
+            return rt;
+        }
+
+        /// <summary>The arrows sit just either side of the campaign's name, which they switch, not out at the panel's edges.</summary>
+        private static void PlaceCampaignArrows()
+        {
+            float half = Mathf.Min(_campaign.preferredWidth / 2f + 34f, PanelWidth / 2f - 40f);
+            _prevArrow.anchoredPosition = new Vector2(-half, -73);
+            _nextArrow.anchoredPosition = new Vector2(half, -73);
         }
 
         private static bool Paused() => Singleton<PauseMenu>.InstanceExists && Singleton<PauseMenu>.Instance.IsPaused;
@@ -587,7 +684,12 @@ namespace PaperTrail
             button.onClick = new Button.ButtonClickedEvent();
             button.onClick.AddListener((UnityAction)onClick);
             NoNavigation(button);
+            // The game tints this button black at 30% (its Export button), which shows on the light save-slot cards it
+            // sits on but all but vanishes on the dark panel here. A light tint makes it the game's grey button instead.
             var colors = button.colors;
+            colors.normalColor = colors.selectedColor = new Color(1f, 1f, 1f, 0.12f);
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.2f);
+            colors.pressedColor = new Color(1f, 1f, 1f, 0.28f);
             colors.disabledColor = colors.normalColor;      // a disabled button only fades its text, as the game's do
             button.colors = colors;
             text.text = label;
@@ -597,7 +699,8 @@ namespace PaperTrail
         private static RectTransform List(RectTransform rt)
         {
             var viewport = Ui.Place(Ui.Node("Viewport", rt), 0, 0, 1, 1);
-            viewport.gameObject.AddComponent<RectMask2D>();
+            // A soft edge, so a row scrolled half out of view fades rather than being cut off by the buttons.
+            viewport.gameObject.AddComponent<RectMask2D>().softness = new Vector2Int(0, ListFade);
             Ui.Box(viewport, new Color(0, 0, 0, 0.001f));          // scroll-wheel target between rows
             var content = Ui.Node("Content", viewport);
             content.anchorMin = new Vector2(0, 1);
@@ -608,7 +711,7 @@ namespace PaperTrail
             var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
             layout.spacing = RowSpacing;                            // the game's slot spacing
             int pad = (int)ListPadding;
-            layout.padding = new RectOffset(pad, pad, pad, pad);    // room for the selection frame, which overhangs a row by 5
+            layout.padding = new RectOffset(pad, pad, ListFade, ListFade);  // room for the selection frame (it overhangs a row by 5), and rows at rest stay clear of the faded edges
             layout.childControlHeight = true;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
@@ -633,15 +736,16 @@ namespace PaperTrail
         private static void Refresh()
         {
             if (!_open || _root == null) return;
-            _campaign.text = CampaignName(_slot);
-            bool browse = _mode == Mode.Load && Campaigns().Count() > 1;      // any campaign, also from inside a game
+            _campaign.text = _archive != null ? ArchiveName(_archive) : CampaignName(_slot);
+            bool browse = _mode == Mode.Load && AllCampaigns().Count > 1;      // any campaign, archived ones too, also from inside a game
             _prevCampaign.Button.gameObject.SetActive(browse);
             _nextCampaign.Button.gameObject.SetActive(browse);
+            if (browse) PlaceCampaignArrows();
 
             for (int i = _content.childCount - 1; i >= 0; i--) Object.Destroy(_content.GetChild(i).gameObject);
             Entries.Clear();
             if (_mode == Mode.Save) AddRow(null, 0);
-            var snaps = Store.List(_slot);
+            var snaps = Snapshots();
             for (int i = 0; i < snaps.Count; i++) AddRow(snaps[i], i + 1);
 
             if (Entries.Count == 0)
@@ -653,7 +757,7 @@ namespace PaperTrail
             if (_selected >= Entries.Count || _selected < 0) _selected = Entries.Count > 0 ? 0 : -1;
             Select(_selected);
             // Only as tall as the saves need, like the game's own screens, up to a scrolling maximum.
-            _listHeight = Mathf.Clamp(100 + 56 + 12 + Entries.Count * 75, PanelMinHeight, PanelHeight);
+            _listHeight = Mathf.Clamp(100 + 56 + 2 * ListFade + Entries.Count * 75, PanelMinHeight, PanelHeight);
             if (_modal == null) SetPanelHeight(_listHeight);
         }
 
@@ -759,7 +863,12 @@ namespace PaperTrail
                 SaveKind.Safeguard => "Safeguard",
                 _ => "Manual",
             };
-            return (s.Suspect ? "\u26A0 " : "") + (s.Pinned ? "\u2605 " : "") + kind;
+            // Words, not symbols: the game's font has no star or warning sign (they showed as an empty box).
+            var parts = new System.Collections.Generic.List<string>();
+            if (s.Suspect) parts.Add("Looks incomplete");
+            if (s.Pinned) parts.Add("Pinned");
+            parts.Add(kind);
+            return string.Join(", ", parts);
         }
 
         /// <summary>Money the way the game's save slots show it: $62.2K in green, $1.2M in gold.</summary>
@@ -800,12 +909,14 @@ namespace PaperTrail
                 if (Entries[i].Frame != null) Entries[i].Frame.SetActive(i == index);
             var snap = Current;
             bool isSnap = snap != null;
-            bool canLoadSlot = !isSnap && _mode == Mode.Load && SaveInfoOf(_slot) != null && Entries.Count == 0;
+            bool canLoadSlot = !isSnap && _mode == Mode.Load && _archive == null && SaveInfoOf(_slot) != null && Entries.Count == 0;
 
             _load?.SetEnabled(!_saving && (isSnap || canLoadSlot));
             _rename.SetEnabled(!_saving && isSnap);
             _pin.SetEnabled(!_saving && isSnap);
             _delete.SetEnabled(!_saving && isSnap);
+            _export?.SetEnabled(!_saving && _archive == null && SaveInfoOf(_slot) != null);
+            _import?.SetEnabled(!_saving && _archive == null);
             _pin.Text.text = isSnap && snap.Pinned ? "Unpin" : "Pin";
             int wait = _mode == Mode.Save ? Mathf.CeilToInt(Mod.CooldownLeft()) : 0;
             bool atLimit = _mode == Mode.Save && Store.List(_slot).Count(x => x.Kind == SaveKind.Manual) >= Settings.ManualSavesKept;
@@ -836,9 +947,39 @@ namespace PaperTrail
 
         // ---------------------------------------------------------------- actions
 
+        /// <summary>
+        /// Runs the game's own Export or Import for the slot on show, from its Continue screen's buttons, so its file
+        /// dialogs and import confirmation do the work. The handler is called directly: that screen is never opened
+        /// now (Continue loads straight in), and its buttons only hook their click up when it first opens. Import
+        /// opens the game's import screen, so this one closes first.
+        /// </summary>
+        private static void RunGameSlotAction(bool import)
+        {
+            try
+            {
+                var screen = Object.FindObjectOfType<ContinueScreen>(true);
+                if (screen == null) { Note("The game's Continue screen was not found.", true); return; }
+                if (import)
+                {
+                    var button = screen.GetComponentsInChildren<SaveImportButton>(true).FirstOrDefault(c => c.SaveSlotIndex == _slot - 1);
+                    if (button == null) { Note($"The game's Import for slot {_slot} was not found.", true); return; }
+                    CloseIfOpen();
+                    button.Clicked();
+                }
+                else
+                {
+                    var button = screen.GetComponentsInChildren<SaveExportButton>(true).FirstOrDefault(c => c.SaveSlotIndex == _slot - 1);
+                    if (button == null) { Note($"The game's Export for slot {_slot} was not found.", true); return; }
+                    button.Clicked();
+                }
+            }
+            catch (Exception e) { Mod.Log.Warning($"save screen: {(import ? "import" : "export")}: " + e.Message); }
+        }
+
         private static void Load()
         {
             var snap = Current;
+            if (_archive != null) { LoadArchived(snap); return; }
             if (snap == null && !(Entries.Count == 0 && SaveInfoOf(_slot) != null)) return;
             // The newest snapshot of a slot nothing has saved over since is the slot itself: start it as it is.
             var restore = snap;
@@ -851,6 +992,34 @@ namespace PaperTrail
                 return;
             }
             Mod.LoadNow(slot, restore, false);
+        }
+
+        /// <summary>A load that failed before it started: the list is read again (folders may have moved) and the reason shown.</summary>
+        public static void ShowFailure(string message)
+        {
+            if (!_open) return;
+            if (_modal != null) CloseModal();
+            if (_archive != null && !System.IO.Directory.Exists(_archive)) _archive = null;    // it is back in its slot now
+            _selected = -1;
+            Refresh();
+            Note(message, true);
+        }
+
+        /// <summary>An archived campaign's save goes back into the slot it was played in, after asking.</summary>
+        private static void LoadArchived(SnapshotInfo snap)
+        {
+            if (snap == null) return;
+            string archive = _archive;
+            int slot = Store.Campaign(archive).Slot;
+            if (slot < 1 || slot > 5) slot = Enumerable.Range(1, 5).FirstOrDefault(i => SaveInfoOf(i) == null);
+            if (slot == 0) { Note("This archived campaign does not say which slot it came from, and no slot is free.", true); return; }
+            var now = SaveInfoOf(slot);
+            string body = now == null
+                ? $"It goes back into slot {slot}, which is empty."
+                : $"It goes back into slot {slot}, in place of {Escape(now.OrganisationName)}. That campaign's saves are archived and a copy of its last save is kept, so nothing is lost.";
+            bool fromGame = Mod.Instance.CurrentSlot > 0;
+            if (fromGame) body += " Anything since your last save will be lost.";
+            Modal("Load this archived campaign?", body, null, "Load", _ => Mod.LoadArchived(archive, slot, snap, fromGame), danger: true);
         }
 
         /// <summary>

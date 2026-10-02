@@ -24,12 +24,13 @@ namespace PaperTrail
         private static string Tombstones => Path.Combine(Store.LocalRoot, "deleted.txt");
 
         /// <summary>Forgets a deleted snapshot, so the mirror removes it from the synced folder and does not restore it.</summary>
-        public static void Deleted(int slot, string name)
+        /// <param name="campaign">The campaign's folder, relative to the snapshots root: "Slot_2" or "Archive/...".</param>
+        public static void Deleted(string campaign, string name)
         {
             try
             {
                 Directory.CreateDirectory(Store.LocalRoot);
-                File.AppendAllLines(Tombstones, new[] { $"Slot_{slot}/{name}" });
+                File.AppendAllLines(Tombstones, new[] { $"{campaign}/{name}" });
             }
             catch (Exception e) { Mod.Log.Warning("could not remember a deleted snapshot: " + e.Message); }
         }
@@ -73,10 +74,10 @@ namespace PaperTrail
         {
             var deleted = new HashSet<string>(File.Exists(Tombstones) ? File.ReadAllLines(Tombstones) : Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
             int toCloud = 0, toLocal = 0, removed = 0;
-            for (int slot = 1; slot <= 5; slot++)
+            foreach (var campaign in CampaignFolders())
             {
-                string local = Store.SlotFolder(slot);
-                string cloud = Path.Combine(Store.CloudRoot, "Slot_" + slot);
+                string local = Path.Combine(Store.LocalRoot, campaign);
+                string cloud = Path.Combine(Store.CloudRoot, campaign);
                 if (!Directory.Exists(local) && !Directory.Exists(cloud)) continue;
                 Directory.CreateDirectory(local);
                 Directory.CreateDirectory(cloud);
@@ -85,7 +86,7 @@ namespace PaperTrail
                 var there = Names(cloud);
                 foreach (var name in there)
                 {
-                    if (deleted.Contains($"Slot_{slot}/{name}"))
+                    if (deleted.Contains($"{campaign}/{name}"))
                     {
                         Try(() => Directory.Delete(Path.Combine(cloud, name), true));
                         removed++;
@@ -97,7 +98,7 @@ namespace PaperTrail
                     else SyncDetails(Path.Combine(local, name), Path.Combine(cloud, name));
                 }
                 foreach (var name in here)
-                    if (!there.Contains(name) && !deleted.Contains($"Slot_{slot}/{name}"))
+                    if (!there.Contains(name) && !deleted.Contains($"{campaign}/{name}"))
                         if (Try(() => CopyWhole(Path.Combine(local, name), Path.Combine(cloud, name)))) toCloud++;
 
                 // The campaign's play time and auto-save number: whichever was written last.
@@ -105,6 +106,19 @@ namespace PaperTrail
             }
             if (toCloud + toLocal + removed > 0)
                 Mod.Log.Msg($"snapshots synced with Steam Cloud: {toCloud} sent, {toLocal} brought back, {removed} removed");
+        }
+
+        /// <summary>The five slots' histories and every archived one, on either side ("Slot_1", "Archive/...").</summary>
+        private static IEnumerable<string> CampaignFolders()
+        {
+            for (int slot = 1; slot <= 5; slot++) yield return "Slot_" + slot;
+            var archives = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var root in new[] { Store.LocalRoot, Store.CloudRoot })
+            {
+                var dir = Path.Combine(root, "Archive");
+                if (Directory.Exists(dir)) foreach (var d in Directory.GetDirectories(dir)) archives.Add(Path.GetFileName(d));
+            }
+            foreach (var name in archives) yield return "Archive/" + name;
         }
 
         private static HashSet<string> Names(string folder)

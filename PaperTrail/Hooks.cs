@@ -17,14 +17,19 @@ namespace PaperTrail
     {
         private const string SaveButtonName = "PaperTrail.Save";
         private const string LoadButtonName = "PaperTrail.Load";
+        private const string LoadGameButtonName = "PaperTrail.LoadGame";
 
         public static IEnumerator AttachWhenReady(string scene)
         {
-            float until = Time.realtimeSinceStartup + 1.5f;
-            while (Time.realtimeSinceStartup < until) yield return null;
+            // As soon as the menu's buttons exist, so Load Game is there when the menu shows rather than popping in;
+            // the pause menu is not seen until later, so it can wait the same short while as before.
+            float until = Time.realtimeSinceStartup + (scene == "Menu" ? 10f : 1.5f);
+            while (Time.realtimeSinceStartup < until
+                   && (scene != "Menu" || !FindButtons("Continue").Any(b => b.gameObject.activeInHierarchy)))
+                yield return null;
             try
             {
-                if (scene == "Menu") { Templates.Capture(); AttachMainMenu(); }
+                if (scene == "Menu") { AttachMainMenu(); Templates.Capture(); }
                 else if (scene == "Main") AttachPauseMenu();
             }
             catch (Exception e) { Mod.Log.Warning($"could not add the save screen to the {scene} scene: {e.Message}"); }
@@ -47,7 +52,7 @@ namespace PaperTrail
 
         private static Button FindButton(string label, Transform under = null) => FindButtons(label, under).FirstOrDefault();
 
-        private static string PathOf(Transform t)
+        internal static string PathOf(Transform t)
         {
             var parts = new System.Collections.Generic.List<string>();
             for (; t != null; t = t.parent) parts.Add(t.name);
@@ -66,21 +71,34 @@ namespace PaperTrail
         }
 #endif
 
-        /// <summary>The main menu's Continue opens the load screen instead of the game's slot list.</summary>
+        /// <summary>
+        /// The main menu's Continue loads the last played save straight away, and a Load Game button below it opens the
+        /// load screen (the game's Continue opened its slot list).
+        /// </summary>
         private static void AttachMainMenu()
         {
             var buttons = FindButtons("Continue");
-            if (buttons.Length == 0) { Mod.Log.Warning("main menu: no Continue button found - the load screen is not on the menu"); return; }
+            if (buttons.Length == 0) { Mod.Log.Warning("main menu: no Continue button found - Continue and Load Game are not hooked"); return; }
             Ui.FindFont(buttons[0]);
             foreach (var cont in buttons)
             {
                 cont.onClick = new Button.ButtonClickedEvent();
-                cont.onClick.AddListener((UnityAction)new Action(() => SaveScreen.Open(SaveScreen.Mode.Load)));
-                cont.interactable = true;
+                cont.onClick.AddListener((UnityAction)new Action(ContinueLastPlayed));      // greyed out by the game with no saves
             }
             var visible = buttons.FirstOrDefault(b => b.gameObject.activeInHierarchy);
-            Mod.Log.Msg($"main menu: Continue opens the Paper Trail load screen ({buttons.Length} Continue button(s) hooked; "
-                      + (visible != null ? "visible one: " + PathOf(visible.transform) : "none of them is visible yet") + ")");
+            if (visible == null) { Mod.Log.Warning("main menu: no visible Continue button - no Load Game button added"); return; }
+            if (!visible.transform.parent.GetComponentsInChildren<Transform>(true).Any(t => t.name == LoadGameButtonName))
+                AddButtonBelow(visible, visible.gameObject, LoadGameButtonName, "Load Game", () => SaveScreen.Open(SaveScreen.Mode.Load));
+            Mod.Log.Msg($"main menu: Continue loads the last played save, Load Game opens the load screen ({PathOf(visible.transform)})");
+        }
+
+        /// <summary>Loads the most recently played save as it was last saved; with none, opens the load screen.</summary>
+        private static void ContinueLastPlayed()
+        {
+            var last = Il2CppScheduleOne.Persistence.LoadManager.LastPlayedGame;
+            if (last == null) { SaveScreen.Open(SaveScreen.Mode.Load); return; }
+            Mod.Log.Msg($"continue: loading {last.OrganisationName} (slot {last.SaveSlotNumber})");
+            Mod.LoadNow(last.SaveSlotNumber, null, false);
         }
 
         /// <summary>Save and Load buttons below Resume in the pause menu, copied from it so they look the same.</summary>
@@ -93,21 +111,21 @@ namespace PaperTrail
             if (resume == null) { Mod.Log.Warning("pause menu: no Resume button found - no Save or Load button added"); return; }
             Ui.FindFont(resume);
 
-            var save = AddPauseButton(resume, resume.gameObject, SaveButtonName, "Save", SaveScreen.Mode.Save);
-            AddPauseButton(resume, save, LoadButtonName, "Load", SaveScreen.Mode.Load);
+            var save = AddButtonBelow(resume, resume.gameObject, SaveButtonName, "Save", () => SaveScreen.Open(SaveScreen.Mode.Save));
+            AddButtonBelow(resume, save, LoadButtonName, "Load", () => SaveScreen.Open(SaveScreen.Mode.Load));
             Mod.Log.Msg("pause menu: Save and Load added below Resume");
         }
 
-        /// <summary>A copy of Resume placed just below <paramref name="above"/>, opening the save screen in <paramref name="mode"/>.</summary>
-        private static GameObject AddPauseButton(Button resume, GameObject above, string name, string label, SaveScreen.Mode mode)
+        /// <summary>A copy of <paramref name="model"/> placed just below <paramref name="above"/>, doing <paramref name="onClick"/>.</summary>
+        private static GameObject AddButtonBelow(Button model, GameObject above, string name, string label, Action onClick)
         {
-            var parent = resume.transform.parent;
-            var copy = Object.Instantiate(resume.gameObject, parent);
+            var parent = model.transform.parent;
+            var copy = Object.Instantiate(model.gameObject, parent);
             copy.name = name;
             copy.transform.SetSiblingIndex(above.transform.GetSiblingIndex() + 1);
             var button = copy.GetComponent<Button>();
             button.onClick = new Button.ButtonClickedEvent();
-            button.onClick.AddListener((UnityAction)new Action(() => SaveScreen.Open(mode)));
+            button.onClick.AddListener((UnityAction)onClick);
             var text = copy.GetComponentInChildren<TextMeshProUGUI>(true);
             if (text != null) text.text = label;
 
@@ -116,7 +134,7 @@ namespace PaperTrail
             if (parent.GetComponent<LayoutGroup>() == null)
             {
                 var anchor = above.GetComponent<RectTransform>();
-                float step = resume.GetComponent<RectTransform>().rect.height + 10f;
+                float step = model.GetComponent<RectTransform>().rect.height + 10f;
                 foreach (var b in parent.GetComponentsInChildren<Button>(true))
                 {
                     var rt = b.GetComponent<RectTransform>();

@@ -69,6 +69,17 @@ namespace PaperTrail
 
         /// <summary>The mods ("Name vX") installed when this campaign was last played.</summary>
         public List<string> Mods { get; set; } = new List<string>();
+
+        /// <summary>
+        /// Which campaign this is: the slot it was played in, its organisation, and the game's creation time of its
+        /// save (ticks). A different creation time in the slot means a new game or an import replaced it there.
+        /// </summary>
+        public int Slot { get; set; }
+        public string Organisation { get; set; } = "";
+        public long SaveCreatedTicks { get; set; }
+
+        /// <summary>Set once its history was archived because another campaign took its slot.</summary>
+        public DateTime? ArchivedUtc { get; set; }
     }
 
     /// <summary>
@@ -103,6 +114,16 @@ namespace PaperTrail
 
         public static string SlotFolder(int slot) => Path.Combine(Root, "Slot_" + slot);
 
+        /// <summary>Histories of campaigns another campaign replaced in their slot, one folder each.</summary>
+        public static string ArchiveRoot => Path.Combine(Root, "Archive");
+        private static string CloudArchiveRoot => Path.Combine(CloudRoot, "Archive");
+
+        /// <summary>The archived campaigns, newest first.</summary>
+        public static List<string> Archives()
+            => Directory.Exists(ArchiveRoot)
+                ? Directory.GetDirectories(ArchiveRoot).Where(d => List(d).Count > 0).OrderByDescending(Path.GetFileName).ToList()
+                : new List<string>();
+
         public static string GameSlotFolder(int slot) => Path.Combine(SavesRoot, "SaveGame_" + slot);
 
         /// <summary>Paper Trail's early builds were called SaveKeeper: their snapshots are renamed, once, for the mirror to find.</summary>
@@ -125,30 +146,120 @@ namespace PaperTrail
 
         // ---------------------------------------------------------------- campaigns
 
-        public static CampaignInfo Campaign(int slot)
+        public static CampaignInfo Campaign(int slot) => Campaign(SlotFolder(slot));
+
+        public static CampaignInfo Campaign(string folder)
         {
             try
             {
-                var file = Path.Combine(SlotFolder(slot), CampaignFile);
+                var file = Path.Combine(folder, CampaignFile);
                 if (File.Exists(file)) return JsonSerializer.Deserialize<CampaignInfo>(File.ReadAllText(file), Json) ?? new CampaignInfo();
             }
-            catch (Exception e) { Mod.Log.Warning($"campaign {slot}: could not read its bookkeeping ({e.Message}); starting fresh"); }
+            catch (Exception e) { Mod.Log.Warning($"campaign {Path.GetFileName(folder)}: could not read its bookkeeping ({e.Message}); starting fresh"); }
             return new CampaignInfo();
         }
 
-        public static void SaveCampaign(int slot, CampaignInfo info)
+        public static void SaveCampaign(int slot, CampaignInfo info) => SaveCampaign(SlotFolder(slot), info);
+
+        public static void SaveCampaign(string folder, CampaignInfo info)
         {
-            Directory.CreateDirectory(SlotFolder(slot));
-            WriteAtomic(Path.Combine(SlotFolder(slot), CampaignFile), JsonSerializer.Serialize(info, Json));
+            Directory.CreateDirectory(folder);
+            WriteAtomic(Path.Combine(folder, CampaignFile), JsonSerializer.Serialize(info, Json));
+        }
+
+        /// <summary>
+        /// The campaign now in the slot is <paramref name="organisation"/>, created at <paramref name="createdTicks"/>. If
+        /// the slot's history belongs to another campaign (a new game or an import took the slot), that history is
+        /// archived, so the two never share one list and the old one can still be loaded. Returns the campaign's
+        /// bookkeeping.
+        /// </summary>
+        public static CampaignInfo Claim(int slot, string organisation, long createdTicks)
+        {
+            lock (Work.Disk)
+            {
+                var info = Campaign(slot);
+                bool other;
+                if (info.SaveCreatedTicks != 0) other = Math.Abs(info.SaveCreatedTicks - createdTicks) > TimeSpan.TicksPerSecond * 2;
+                else
+                {
+                    // Bookkeeping from before this was recorded: judge by the organisation of the newest snapshot.
+                    string newest = List(slot).FirstOrDefault()?.Organisation ?? "";
+                    other = newest.Length > 0 && !string.Equals(newest, organisation, StringComparison.Ordinal);
+                }
+                if (other && List(slot).Count > 0)
+                {
+                    string archived = ArchiveLocked(slot, info);
+                    Mod.Log.Msg($"slot {slot} now holds {organisation}; the history of {Path.GetFileName(archived)} was archived");
+                    info = new CampaignInfo();
+                }
+                info.Slot = slot;
+                info.Organisation = organisation ?? "";
+                info.SaveCreatedTicks = createdTicks;
+                SaveCampaign(slot, info);
+                return info;
+            }
+        }
+
+        private static string ArchiveLocked(int slot, CampaignInfo info)
+        {
+            string org = info.Organisation.Length > 0 ? info.Organisation : List(slot).FirstOrDefault()?.Organisation ?? "";
+            string name = $"{DateTime.Now:yyyyMMdd-HHmmss}-slot{slot}-{SafeName(org)}";
+            info.Slot = slot;
+            info.Organisation = org;
+            info.ArchivedUtc = DateTime.UtcNow;
+            SaveCampaign(slot, info);
+            Directory.CreateDirectory(ArchiveRoot);
+            var target = Path.Combine(ArchiveRoot, name);
+            Directory.Move(SlotFolder(slot), target);
+            // The synced copy moves with it, or the mirror would bring the old history back into the slot.
+            var cloud = Path.Combine(CloudRoot, "Slot_" + slot);
+            if (Directory.Exists(cloud))
+                try { Directory.CreateDirectory(CloudArchiveRoot); Directory.Move(cloud, Path.Combine(CloudArchiveRoot, name)); }
+                catch (Exception e) { Mod.Log.Warning("could not archive the Steam Cloud copy: " + e.Message); }
+            Mirror.Request();
+            return target;
+        }
+
+        /// <summary>
+        /// Puts an archived campaign's history back as its slot's, archiving whatever history the slot has now. The
+        /// game's save in the slot is not touched; restore a snapshot after this.
+        /// </summary>
+        public static void Unarchive(string archive, int slot)
+        {
+            lock (Work.Disk)
+            {
+                if (Directory.Exists(SlotFolder(slot)) && List(slot).Count > 0) ArchiveLocked(slot, Campaign(slot));
+                else if (Directory.Exists(SlotFolder(slot))) Directory.Delete(SlotFolder(slot), true);
+                string name = Path.GetFileName(archive);
+                Directory.Move(archive, SlotFolder(slot));
+                var cloud = Path.Combine(CloudArchiveRoot, name);
+                var cloudSlot = Path.Combine(CloudRoot, "Slot_" + slot);
+                if (Directory.Exists(cloud) && !Directory.Exists(cloudSlot))
+                    try { Directory.Move(cloud, cloudSlot); } catch (Exception e) { Mod.Log.Warning("could not move the Steam Cloud copy back: " + e.Message); }
+                var info = Campaign(slot);
+                info.Slot = slot;
+                info.ArchivedUtc = null;
+                SaveCampaign(slot, info);
+                Mirror.Request();
+            }
+        }
+
+        private static string SafeName(string name)
+        {
+            var bad = Path.GetInvalidFileNameChars();
+            var clean = new string((name ?? "").Select(c => bad.Contains(c) ? '_' : c).ToArray()).Trim();
+            return clean.Length == 0 ? "campaign" : clean.Length > 40 ? clean.Substring(0, 40) : clean;
         }
 
         // ---------------------------------------------------------------- snapshots
 
         /// <summary>Every snapshot of a slot, newest first.</summary>
-        public static List<SnapshotInfo> List(int slot)
+        public static List<SnapshotInfo> List(int slot) => List(SlotFolder(slot));
+
+        /// <summary>Every snapshot in a campaign's folder (a slot's or an archived one), newest first.</summary>
+        public static List<SnapshotInfo> List(string folder)
         {
             var list = new List<SnapshotInfo>();
-            var folder = SlotFolder(slot);
             if (!Directory.Exists(folder)) return list;
             foreach (var dir in Directory.GetDirectories(folder))
             {
@@ -213,9 +324,8 @@ namespace PaperTrail
         private static void DeleteLocked(SnapshotInfo info)
         {
             // Remembered first: a sync that sees the cloud copy must know it was deleted on purpose.
-            string slot = Path.GetFileName(Path.GetDirectoryName(info.Folder)) ?? "";
-            if (slot.StartsWith("Slot_", StringComparison.Ordinal) && int.TryParse(slot.Substring(5), out int n))
-                Mirror.Deleted(n, Path.GetFileName(info.Folder));
+            var campaign = Path.GetDirectoryName(info.Folder);
+            if (campaign != null) Mirror.Deleted(Path.GetRelativePath(Root, campaign).Replace('\\', '/'), Path.GetFileName(info.Folder));
             if (Directory.Exists(info.Folder)) Directory.Delete(info.Folder, true);
             Mirror.Request();
         }
@@ -271,7 +381,7 @@ namespace PaperTrail
             {
                 current.Kind = SaveKind.BeforeRestore;
                 current.Pinned = true;
-                current.Note = "Before restoring " + Describe(snapshot);
+                current.Note = "Kept before loading " + ShortName(snapshot);
                 Take(slot, current);
             }
 
@@ -292,13 +402,32 @@ namespace PaperTrail
             {
                 SaveKind.Auto => $"AutoSave {s.AutoNumber} - {s.Location}",
                 SaveKind.Sleep => $"Sleep - {s.Location}",
-                SaveKind.BeforeRestore => $"Before restore - {s.Location}",
+                SaveKind.BeforeRestore => $"Kept copy - {s.Location}",
                 SaveKind.Milestone => $"{s.Reason} - {s.Location}",
                 SaveKind.Safeguard => $"{s.Reason} - {s.Location}",
                 _ => s.Location,
             };
             string when = s.GameDay > 0 ? $" - Day {s.GameDay}, {Clock(s.GameTime)}" : "";
             return $"{head}{when} - {PlayTime(s.PlaySeconds)}";
+        }
+
+        /// <summary>
+        /// A snapshot named in another snapshot's note: its kind, place and time, never its own note, so restoring a
+        /// kept copy does not wrap one name in another ("Before restoring Before restore - ...").
+        /// </summary>
+        public static string ShortName(SnapshotInfo s)
+        {
+            string kind = s.Kind switch
+            {
+                SaveKind.Auto => $"AutoSave {s.AutoNumber}",
+                SaveKind.Sleep => "a sleep save",
+                SaveKind.BeforeRestore => "a kept copy",
+                SaveKind.Milestone => "a key-moment save",
+                SaveKind.Safeguard => "a safeguard copy",
+                _ => "a manual save",
+            };
+            string when = s.GameDay > 0 ? $", Day {s.GameDay} {Clock(s.GameTime)}" : "";
+            return $"{kind} ({s.Location}{when})";
         }
 
         public static string Clock(int hhmm)
