@@ -1,6 +1,12 @@
 # Melange Psychedelics: in-game checks
 
-Nothing here has run in the game yet. The pure logic (`Logic/`: husbandry, venom quality, lifespan, the pond's windows
+**Run in game so far** (2026-10-02, slot 1, IL2CPP): P1 load and registration pass (vanilla shroom line `sporesyringe` /
+`shroomspawn` / `shroom`; ergot registered and listed at Fungal Phil; Toad and LSD ready; the LSD recipe locked until Ana
+Slughin); the pond is found at (93.78, 3.95, -121.23), radius 5.8 m, 8 spots; Randy's stall at (-95.32, 4.36, -36.96);
+Clive Mossop, the wildlife warden, spawns, warps to his post and was photographed in his ranger kit. Everything past
+loading (catching, the terrarium, the stall's prompts, dosing, painting) is not run yet.
+
+The pure logic (`Logic/`: husbandry, venom quality, lifespan, the pond's windows
 and the wildlife officer, Randy's prices, bad batches, designs and reputation, the batch ledger) is covered by
 `Melange.Tests/PsychedelicsTests.cs`. Everything that touches the game is listed below as a probe, then every assumption
 the code could not settle.

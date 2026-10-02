@@ -153,4 +153,9 @@ Install: `MelangeCore.dll`, `MelangeMixers.dll`, S1API (the IL2CPP build the rep
 - **P1 passed in game** (2026-10-02, slot 1, IL2CPP): the Mk2 is `mixingstationmk2` at $2,000; the three mixers register
   at $6,000 / $12,000 / $20,000, are listed at Oscar's Store (code `shop`) only, and are rank-locked by the game at
   Underlord I, Baron I and Kingpin I. (Oscar's Equipment also sells the Mk2; the mixers are not listed there.)
-- P2-P11 need placing and running a machine: not yet scripted.
+- **P3 passed in game** (2026-10-02, slot 1, scripted with the probe's `S1P.place`: `BuildManager.CreateGridItem` on free
+  tiles): a Three-Ingredient Mixer (footprint 4x2) placed in the motel room logs `2 extra mixer slot(s); Mk2 base 3
+  min/item, batch 20`, is written to `Properties/Motel Room.json`, and after a reload comes back with the same GUID and
+  `extra slots restored; chain (idle)`. (Placed in the RV of the test save, where the RV is still wrecked, nothing was
+  saved at all, the Mk2 included: the RV, not the mixer.)
+- P2 and P4-P11 need a mix to run (the station UI, or an employee): left for a hands-on play test.

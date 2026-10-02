@@ -1,6 +1,13 @@
 # Melange Smuggling: in-game checks
 
-Nothing here has run in the game yet. The pure logic (`Logic/`) is covered by `Melange.Tests/SmugglingTests.cs`
+**Run in game so far** (2026-10-02, slot 1, IL2CPP, scripted with the probe's `S1P.cmd`, which types console commands):
+P1 load and wiring (Oscar's Store `shop` hooked; threshold rolled 10-15 per save; the boat's berth at (-67.4, -6.5,
+-32.5) on `StylizedWater2_Ocean` at y -6.5, quay top -2.5; model loaded, prompt on); `smuggling unlock` (Oscar's line,
+Dafydd's number); an order (#1: 440 units of weed, Standard or better, $73.06 a unit), accepted, sailed empty (NoShow,
+reputation 50 -> 40, next order 3 days on), and returned. Dafydd's tricorn and eyepatch were photographed on him (a
+fit is made only once he is drawn and standing). Loading real product, payment, imports and the route are not run yet.
+
+The pure logic (`Logic/`) is covered by `Melange.Tests/SmugglingTests.cs`
 (unlock roll and counting, order sizing and pricing, timing, payment, police risk with and without the route, imports,
 the voyage state machine, the tanker's rules). Everything that touches the game is listed below as a probe scenario,
 then every assumption the code could not settle.
