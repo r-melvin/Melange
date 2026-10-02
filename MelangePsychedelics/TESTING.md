@@ -203,8 +203,13 @@ it has run. With the setting off, nothing below happens and P9 is unchanged. Tur
   network object(s) inside` and `spray canvas on a frame: scale 0.200, centre (...), camera (...)`, maybe `turned round`.
 - Failure lines to record verbatim: `no vehicle prefab with a spray surface`, `parts outside the copy: ...`, `points at a
   live network object`, any `spray canvas: <exception>`. Each turns painting off for that frame only; dosing still works.
-- Check: **N network object(s) inside** is 0 (a NetworkObject inside the copy is unexpected; note whether anything
-  complains). The named network object should be the vehicle prefab's.
+- Check: **N network object(s) inside** is 1: the count includes the copy's own root, which carries the surface's
+  NetworkObject, copied from the prefab and never spawned (a second one would be unexpected).
+- **Passed in game** (2026-10-02, slot 1, `PaintDesigns = true` for the run only): `spray canvas template: veeper /
+  SpraySurface (350 x 150), components: Transform, SpraySurface, SpraySurfaceInteraction, SprayDisplay, NetworkObject,
+  MonoState; 6 child(ren)`; `spray canvas copy: network object Melange spray canvas, 1 network object(s) inside`; `spray
+  canvas on a frame: scale 0.200, centre (-70.02, 1.70, 85.66), camera (-69.58, 1.74, 85.66)`; no failure lines.
+  Painting itself (P11 on) needs a spray can in hand and the graffiti screen: a hands-on check.
 - Check: nothing visible changes on the frame with no spray can in hand (no outline, no decal on the wall behind, no stray
   canvas in the world at 0,0,0). The base prompt reads `Design: Plain (new), or spray your own on the sheet`.
 
