@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Melange Smuggling: Turnip Night's speedboat at the Docks, bulk exports by sea and imports on the return leg
+       (a Melange spoke; needs Melange Core). Shared settings: ../Directory.Build.props -->
+  <PropertyGroup>
+    <AssemblyName>MelangeSmuggling</AssemblyName>
+    <RootNamespace>Melange.Smuggling</RootNamespace>
+    <!-- S1API is compiled against a pinned copy: -p:S1ApiDll=..., then ../lib (gitignored), then the game's Mods. -->
+    <S1ApiDll Condition="'$(S1ApiDll)' == '' And Exists('$(MSBuildThisFileDirectory)../lib/S1API.Il2Cpp.MelonLoader.dll')">$(MSBuildThisFileDirectory)../lib/S1API.Il2Cpp.MelonLoader.dll</S1ApiDll>
+    <S1ApiDll Condition="'$(S1ApiDll)' == ''">$(GameDir)/Mods/S1API.Il2Cpp.MelonLoader.dll</S1ApiDll>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="S1API.Il2Cpp.MelonLoader"><HintPath>$(S1ApiDll)</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(Interop)/UnityEngine.PhysicsModule.dll</HintPath><Private>false</Private></Reference>
+    <ProjectReference Include="../MelangeCore/MelangeCore.csproj" Private="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Turnip Night's speedboat, built by scripts/art/build_speedboat.py (Blender) and copied into Art/ (committed, so
+         every build has it; scripts/art/out is generated and ignored). Without it the boat is a plain stand-in box. -->
+    <EmbeddedResource Include="Art/speedboat.mesh.json" LogicalName="MelangeSmuggling.speedboat.mesh.json" />
+    <None Remove="Art/**" />
+  </ItemGroup>
+</Project>
