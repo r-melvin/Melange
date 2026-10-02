@@ -7,23 +7,13 @@ Install: `MelangeCore.dll`, `MelangeSewer.dll`, S1API. Log lines come from the `
 `MelonLoader/Latest.log`; quoted text below is what to grep for. Console commands are the game's own (`addxp`, `give`,
 `teleport`, `settime`, `setrelationship`, `changecash`).
 
-## Before anything: hand-overs for the coordinator
+## Hand-overs (done)
 
-1. **Shared events to move to the hub.** `MelangeSewer/SewerEvents.cs` declares, in namespace `Melange.Core`:
-   `MethylamineUnlocked` (published by the cartel spoke; the sewer only listens), `SewerKingSpared`, `SewerKingRevealed`,
-   `SewerKingDefeated`, `GoblinCalmed`, `SewerKingDealChosen`, `BootleggersRouteRevealed`. Move the file's contents into
-   `MelangeCore/SharedEvents.cs` and delete the file: no code changes on either side. Until then no other spoke can use
-   them (and the cartel spoke can't publish `MethylamineUnlocked`).
-2. **`OscarDialogue` patches lazily**, on the first `RewriteLine`/`RewriteChoice`/`AddChoice` call, with its own Harmony id
-   `melange.core.oscar` (I could not edit `Core.cs`). Optional: call it from `Core.OnInitializeMelon` if you want the hub to
-   own the moment; the lazy start is idempotent.
-3. **The King's `OnTick` prefix lives in the spoke** (`KingPatch.cs`): it is the only patch on that method. If a second spoke
-   ever needs it, it moves to the hub.
-4. **`MelonAdditionalDependencies`**: this spoke uses `"MelangeCore"` (the assembly name, per your correction).
-   `MelangeLevels/Mod.cs` still says `"Melange Core"`.
-5. **Found while reading S1API**: `SaveableAutoRegistry` keeps one instance per saveable type for the whole session and
-   `Saveable.LoadInternal` skips fields whose file is missing. So loading save B (no data file) after save A inherits A's
-   values. `MelangeSewerData.Reset()` on `MenuLoaded` guards this spoke; **`MelangeLevelsData` has the same leak** and no guard.
+1. The shared events now live in `MelangeCore/SharedEvents.cs`.
+2. `OscarDialogue` patches lazily with its own Harmony id; kept as is (idempotent, in the hub's assembly).
+3. The King's `OnTick` prefix stays in the spoke while it is the only patch on that method.
+4. `MelangeLevels` already depended on `"MelangeCore"`.
+5. `MelangeLevelsData` now resets to defaults on `MenuLoaded`, as this spoke's data does.
 
 ## Probe scenarios
 
