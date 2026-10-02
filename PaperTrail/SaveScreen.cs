@@ -760,7 +760,7 @@ namespace PaperTrail
                 if (_afterRoom != null)
                     Note(backups < Backups.Limit
                         ? "There is room now. Continue to go ahead."
-                        : $"Slot {_slot} is full ({backups}/{Backups.Limit} backups). Delete one to go ahead, exporting it first to keep it.", backups >= Backups.Limit);
+                        : $"Slot {_slot} is full ({backups}/{Backups.Limit} backups). To go ahead, delete one. Export it first if you want to keep it.", backups >= Backups.Limit);
                 else
                     Note(list.Count == 0
                         ? "No backups yet. One is made before anything replaces this slot: a new game, an import, or loading an older save."
@@ -1078,7 +1078,7 @@ namespace PaperTrail
 
         private static void CreateBackup()
         {
-            if (Backups.Full(_slot)) { Note($"Slot {_slot} has {Backups.Limit} backups already. Delete or export one first.", true); return; }
+            if (Backups.Full(_slot)) { Note($"Slot {_slot} is full ({Backups.Limit}/{Backups.Limit} backups). Delete one first.", true); return; }
             try
             {
                 var made = Backups.BackUpSave(_slot, "Made by you");
