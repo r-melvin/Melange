@@ -22,8 +22,10 @@ nothing to show for them. Melange Levels fills that gap with choices, not more g
   orders are capped at 10).
 - **Underbosses:** with the When Benzies Met Steroids cartel mod, each candidate is another underboss you can hire, so a
   dead one can be replaced and your crew built from the personalities you want. Without it, nothing happens.
-- **Prestige:** spend it in Connections to make offers they can't refuse: a supplier's dead drop is ready now, or 25%
-  off Oscar's stock for a day. Each costs 1 Prestige and has a cooldown.
+- **Prestige:** spend it in Connections to make offers they can't refuse: a supplier's dead drop is ready now, 25%
+  off Oscar's stock for a day, or the police look away until 6 AM (no body searches, no curfew stops, and if they're
+  only searching for you, the search is called off; a chase with cuffs or guns out goes on). Each costs 1 Prestige and
+  has a cooldown (the police one: 3 days). In co-op the police offer covers the host only.
 
 A game already past these ranks when you install the mod gets them on its next load. Rewards are granted once, and are
 saved with your game. In co-op the host earns them for the session.
@@ -32,3 +34,22 @@ saved with your game. In co-op the host earns them for the session.
 
 Fire any employees hired into the extra slots first, then delete `MelangeLevels.dll`. Without the mod those slots, and
 the spots their employees wait at, don't exist; what the game does with an employee left over is untested.
+
+## Testing
+
+Checks to run in game (host or single player) for the police offer; the rules (cost, cooldown, the 6 AM end, which
+pursuits are called off) are covered by `Melange.Tests/OffersTests.cs`. How it works and why: `POLICE-SPIKE.md`.
+
+1. Give yourself Prestige (a Kingpin tier after the first), open Connections: "Lean on the precinct..." is offered for
+   1 Prestige. Buy it: Prestige drops by 1, the line reads "The police are looking away until 6 AM", and the log says
+   `offer: the police look away until 06:00`.
+2. Body searches: carry something illegal, equip a weapon or crouch-run past foot patrols and sentries for a few minutes.
+   No "Being searched..." bar, no "comply" stop. Walk through a foot checkpoint before 21:00: no search.
+3. Curfew: stay out past 21:15 in sight of police. Nobody arrests you for curfew and the HUD doesn't go wanted. (Another
+   crime in sight of them still counts.)
+4. Calling off a search: get to "Investigating" (e.g. hit pedestrians three times with a car, or be reported), then buy
+   the offer: the wanted HUD clears and the officers give up. At "Arresting" or higher, buying it leaves the chase on.
+5. The end: at 06:00 (or after sleeping) the line in Connections goes back to the cooldown note and searches happen
+   again. The offer can be bought again 3 in-game days after the day it was bought.
+6. Save while it's on, quit to the menu, load: it's still on until 6 AM. Load a different save: it's off.
+7. Vehicle checkpoints still search your car: the offer doesn't cover them (see `POLICE-SPIKE.md`).

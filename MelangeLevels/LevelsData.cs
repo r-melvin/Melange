@@ -25,6 +25,8 @@ namespace Melange.Levels
         /// <summary>Offer kind -> the in-game day it was last used.</summary>
         [SaveableField("offersUsed")] public Dictionary<string, int> OffersLastUsed = new Dictionary<string, int>();
         [SaveableField("warehouseDay")] public int WarehouseDiscountDay = -1;
+        /// <summary>The police look away until this in-game minute (<see cref="Offers.AbsoluteMinute"/>); -1: not bought.</summary>
+        [SaveableField("lenientUntil")] public int LenientUntil = -1;
 
         public int LastUsed(OfferKind kind) => OffersLastUsed.TryGetValue(kind.ToString(), out int d) ? d : -1;
 
@@ -46,6 +48,7 @@ namespace Melange.Levels
             Prestige = 0;
             OffersLastUsed = new Dictionary<string, int>();
             WarehouseDiscountDay = -1;
+            LenientUntil = -1;
         }
 
         public int SlotsLeft

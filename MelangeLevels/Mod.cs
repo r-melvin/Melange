@@ -27,5 +27,10 @@ namespace Melange.Levels
             Active = true;
             Rewards.Start();
         }
+
+        public override void OnUpdate()
+        {
+            if (Active) OfferActions.Tick();
+        }
     }
 }

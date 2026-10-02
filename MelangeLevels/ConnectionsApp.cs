@@ -64,6 +64,11 @@ namespace Melange.Levels
                         Offer($"{Offers.Title(kind)}: {s.FirstName}", ok, why, () => OfferActions.RushOrder(s));
                     }
                 }
+                else if (kind == OfferKind.PoliceLookAway)
+                {
+                    if (OfferActions.PoliceLenient()) Line("The police are looking away until 6 AM.", 14);
+                    else Offer(Offers.Title(kind), ok, why, () => OfferActions.PoliceLookAway());
+                }
                 else Offer(Offers.Title(kind), ok, why, () => OfferActions.WarehouseDiscount());
             }
             Line($"Underbosses to hire: {data.UnderbossCandidates}", 18);
