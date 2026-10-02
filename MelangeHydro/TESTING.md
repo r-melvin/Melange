@@ -168,6 +168,34 @@ creates the frame's other holes (P11). The grouped path is unproven; switch to i
 - Load save A (with holes and trained botanists), quit to the menu, load save B (never had the mod). Expect: no holes, no
   training, no pumps carried over from A (the spoke's data is reset at the menu).
 
+### P14. Clipboard bulk assignment
+- Set up: a trained botanist (P8; aeroponics for a 24 limit) and, in one property, a row of 4 Hydro Tray Sections placed
+  edge to edge, a separate row of 3, 2 Aeroponic Tower Sections side by side, and one vanilla pot. `ClipboardBulk = true`
+  (the default) and `Verbose = true` under `[MelangeHydro]`.
+- Open the clipboard on the botanist, click his pot list. Expect the top-of-screen title to read
+  `<the game's title> [hole: whole tray, Crouch+click: one hole, Reload: every tray] (0/24)`. With no holes in the
+  property, or on another employee's list, the title is the game's own.
+- Click the third section of the row of 4. Expect all four outlined as selected, `(4/24)`, log
+  `clipboard: added 3 more hole(s) of a 4-hole Hydro tray`. Click any of the four again: all four deselected,
+  `removed 3 more`. Hold Crouch and click one: only that one changes (the game's own click).
+- The vanilla pot and a lone section: one click, one pot, as in the game.
+- Limit: with a hydroponics-trained botanist (16), select 14 pots, then click a fresh row of 4: expect 2 added (the
+  clicked one and its nearest neighbour), the list full at 16, and the selector closing on its
+  own (the game closes a full list), the clipboard showing 16.
+- Training: a hydroponics-only botanist, click an aero section with an aero neighbour: the neighbour is NOT added (log has
+  no `added` line); the game still adds the clicked one and, within a second, Courses relieves him of it (P8's message).
+- Every tray: on a fresh list press Reload. Log `clipboard: every tray: N hole(s) added (N/limit)`. Expect whole rows
+  nearest the player first, a row skipped rather than split while a later whole one fits, then the room left filled from
+  the skipped rows; the vanilla pot is never added; holes already assigned to another botanist are skipped (the game's
+  "Already assigned to" rule); if it fills the list the selector closes.
+- Submit (E or Enter) and check the clipboard list and the pots' own "assigned botanist" field (look at a hole with the
+  clipboard): every hole picked in bulk shows him. Save, reload: kept (the game saves the list itself).
+- Co-op client opening the host's botanist: bulk clicks work; training is not checked on the client (it has no training
+  data), the host relieves him of what he isn't trained for.
+- Grouped (P11 set-up): clicking any hole of a placed Hydro Tray selects all 5; an Aeroponic Tower all 12. Two frames placed
+  edge to edge count as one tray (expected: they touch).
+- If the patch failed at start the log has `clipboard bulk assign: patch failed (...)` and clicks behave as in the game.
+
 ## Unverified assumptions
 
 Each has a probe above; none has been seen in the game.
@@ -197,12 +225,21 @@ Each has a probe above; none has been seen in the game.
 - **`Fixer.GetAdditionalSigningFee()` and `Employee.SigningFee`** give what Manny charges (the decompile's own sum).
 - **Moving the pot's plant container** up into the model keeps the buds clickable and botanists working.
 - **Grouped placement** (P11): several pots created on the same tiles; their colliders shrunk; numbering by GUID.
+- **Clipboard bulk assignment** (P14): a Harmony prefix on `ObjectSelector.Update` (a Unity message) runs on IL2CPP;
+  the interop's `GetHoveredObject`, `IsObjectTypeValid`, `SetSelectionOutline`, `CloseAndSubmit` and the `selectedObjects`
+  list behave as in the Mono decompile; `GameInput.GetButtonDown(Reload)` / `GetButton(Crouch)` read the keys while the
+  selector is open; `ManagementInterface.Configurables` holds the botanist being edited; the clipboard's list shows all
+  16/24 entries (the UI's entry rows are a prefab array; if it has fewer rows the count still reads right but rows past
+  it are not drawn).
 - **Moisture sync**: `SyncMoistureData` after a botanist's watering and in pump steps keeps clients' bars right.
 
 ## Known limits (v1)
 
 - The pump connects to the nearest tap within 10 m; there is no hose-laying interaction yet.
-- Untrained botanists are relieved of holes after the fact (within a second), not refused at the clipboard.
+- Untrained botanists are relieved of holes after the fact (within a second), not refused at the clipboard (bulk clicks
+  skip them on the host, but a single click on one is still the game's).
+- A "tray" for bulk clicks is any run of touching holes of one kind on one grid: two trays placed edge to edge are picked
+  together (Crouch+click picks one hole).
 - Training is host-only in co-op.
 - Curing on a co-op client follows its own first sighting of the grown plant (no extra network message).
 - Holes have the Grow Tent's 2x2 footprint in Individual mode, so they are no denser than pots.

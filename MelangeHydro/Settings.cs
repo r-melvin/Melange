@@ -11,7 +11,7 @@ namespace Melange.Hydro
     {
         private static MelonPreferences_Entry<string> _placement;
         private static MelonPreferences_Entry<float> _hydroSpeed, _aeroSpeed, _hydroHours, _aeroHours;
-        private static MelonPreferences_Entry<bool> _curing, _extraSites, _pumps, _verbose;
+        private static MelonPreferences_Entry<bool> _curing, _extraSites, _pumps, _clipboardBulk, _verbose;
 
         public static void Create()
         {
@@ -26,6 +26,8 @@ namespace Melange.Hydro
             _curing = c.CreateEntry("AeroCuring", true, "Aero curing", "A ripe plant on an aeroponic tower cures in place: up a tier, holds, then back.");
             _extraSites = c.CreateEntry("AeroExtraBudSites", true, "Aero extra bud sites", "Adds bud sites to aero plants so the yield can pass the game's cap.");
             _pumps = c.CreateEntry("Pumps", true, "Pumps", "Pumps top up hydro and aero reservoirs from the property's tap.");
+            _clipboardBulk = c.CreateEntry("ClipboardBulk", true, "Clipboard bulk assign",
+                "On a botanist's pot list, clicking a hole picks its whole tray (Crouch+click: one hole) and Reload adds every tray in the property.");
             _verbose = c.CreateEntry("Verbose", false, "Verbose log", "Logs each reservoir top-up, curing step and bud-site change (for testing).");
         }
 
@@ -51,6 +53,7 @@ namespace Melange.Hydro
         public static bool Curing => _curing?.Value ?? true;
         public static bool ExtraSites => _extraSites?.Value ?? true;
         public static bool Pumps => _pumps?.Value ?? true;
+        public static bool ClipboardBulk => _clipboardBulk?.Value ?? true;
         public static bool Verbose => _verbose?.Value ?? false;
     }
 }

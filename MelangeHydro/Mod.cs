@@ -33,11 +33,12 @@ namespace Melange.Hydro
             Items.Start();
             Holes.Patch(HarmonyInstance);
             Plants.Patch(HarmonyInstance);
+            Clipboard.Patch(HarmonyInstance);
             Events.Subscribe<SaveLoaded>(_ => Holes.AfterLoad());
             Events.Subscribe<MenuLoaded>(_ =>
             {
                 MelangeHydroData.Current?.ResetToDefaults();
-                Holes.Reset(); Plants.Reset(); Grouping.Reset(); Courses.Reset(); Pumps.Reset(); Looks.Reset();
+                Holes.Reset(); Plants.Reset(); Grouping.Reset(); Courses.Reset(); Pumps.Reset(); Looks.Reset(); Clipboard.Reset();
             });
             Log.Msg($"placement: {Settings.Placement}");
         }

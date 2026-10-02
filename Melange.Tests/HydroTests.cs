@@ -495,4 +495,122 @@ namespace Melange.Tests
             Assert.True(Units.AeroTower.Price < Units.AeroSection.Price * Units.AeroTower.Sites);
         }
     }
+
+    public sealed class HydroClipboardTests
+    {
+        // A 2x2 footprint at (x, y) on a grid, as the game's Grow Tent clones cover.
+        private static SiteSpot At(int x, int y, HoleKind kind = HoleKind.Hydro, string grid = "g")
+            => new SiteSpot(grid, kind, new[] { (x, y), (x + 1, y), (x, y + 1), (x + 1, y + 1) });
+
+        [Fact]
+        public void SectionsSideBySideFormOneTrayNearestFirst()
+        {
+            // A row of four sections, clicked at the third: itself, then its neighbours, then the far end.
+            var spots = new[] { At(0, 0), At(2, 0), At(4, 0), At(6, 0) };
+            Assert.Equal(new[] { 2, 1, 3, 0 }, Bulk.Run(spots, 2));
+        }
+
+        [Fact]
+        public void AGroupedFramesHolesShareTilesAndAreOneTray()
+        {
+            var spots = new[] { At(3, 3), At(3, 3), At(3, 3), At(9, 9) };
+            Assert.Equal(new[] { 1, 0, 2 }, Bulk.Run(spots, 1));
+        }
+
+        [Fact]
+        public void TraysDoNotJoinAcrossAGapDiagonalKindOrGrid()
+        {
+            Assert.Single(Bulk.Run(new[] { At(0, 0), At(3, 0) }, 0));                       // a one-tile gap
+            Assert.Single(Bulk.Run(new[] { At(0, 0), At(2, 2) }, 0));                       // corners only
+            Assert.Single(Bulk.Run(new[] { At(0, 0), At(2, 0, HoleKind.Aero) }, 0));         // hydro next to aero
+            Assert.Single(Bulk.Run(new[] { At(0, 0), At(2, 0, grid: "upstairs") }, 0));     // another grid
+        }
+
+        [Fact]
+        public void RunsCoverEverySpotOnce()
+        {
+            var spots = new[] { At(0, 0), At(10, 0), At(2, 0), At(12, 0), At(20, 20, HoleKind.Aero) };
+            var runs = Bulk.Runs(spots);
+            Assert.Equal(3, runs.Count);
+            Assert.Equal(new[] { 0, 2 }, runs[0]);
+            Assert.Equal(new[] { 1, 3 }, runs[1]);
+            Assert.Equal(new[] { 4 }, runs[2]);
+            Assert.Empty(Bulk.Run(spots, 7));
+        }
+
+        [Fact]
+        public void ClickingAnUnselectedHoleAddsItsTrayMatesLeavingTheGameItsSlot()
+        {
+            var run = new[] { 0, 1, 2, 3, 4 };
+            var change = Bulk.Click(run, i => false, i => true, count: 0, max: 16);
+            Assert.True(change.Add);
+            Assert.Equal(new[] { 1, 2, 3, 4 }, change.Others);       // the game adds hole 0 itself
+        }
+
+        [Fact]
+        public void AddingStopsAtTheBotanistsLimit()
+        {
+            // 14 of 16 taken: one tray-mate, and the clicked hole fills the 16th slot (the game then closes the list).
+            var run = new[] { 0, 1, 2, 3, 4 };
+            var change = Bulk.Click(run, i => false, i => true, count: 14, max: 16);
+            Assert.Equal(new[] { 1 }, change.Others);
+            Assert.Empty(Bulk.Click(run, i => false, i => true, count: 15, max: 16).Others);   // room for the clicked hole only
+            Assert.Empty(Bulk.Click(run, i => false, i => true, count: 16, max: 16).Others);   // full: the game adds nothing either
+            Assert.Equal(3, Bulk.Click(run, i => false, i => true, count: 4, max: 8).Others.Count);   // untrained limit, 8
+        }
+
+        [Fact]
+        public void TheTrainedLimitsTakeAWholeTowerOrTwoTrays()
+        {
+            var tower = Enumerable.Range(0, 12).ToArray();
+            Assert.Equal(11, Bulk.Click(tower, i => false, i => true, 0, Training.AeroponicsPotLimit).Others.Count);
+            Assert.Equal(7, Bulk.Click(tower, i => false, i => true, 0, Training.VanillaPotLimit).Others.Count);
+        }
+
+        [Fact]
+        public void AddingSkipsSelectedAndIneligibleHoles()
+        {
+            var run = new[] { 0, 1, 2, 3, 4 };
+            var change = Bulk.Click(run, i => i == 2, i => i != 3, count: 1, max: 16);
+            Assert.Equal(new[] { 1, 4 }, change.Others);
+        }
+
+        [Fact]
+        public void AnIneligibleClickedHoleBringsNoTrayMates()
+            => Assert.Empty(Bulk.Click(new[] { 0, 1, 2 }, i => false, i => i != 0, 0, 16).Others);
+
+        [Fact]
+        public void ClickingASelectedHoleRemovesItsSelectedTrayMates()
+        {
+            var run = new[] { 2, 0, 1, 3 };
+            var change = Bulk.Click(run, i => i != 3, i => true, count: 3, max: 16);
+            Assert.False(change.Add);
+            Assert.Equal(new[] { 0, 1 }, change.Others);              // the game removes hole 2 itself
+        }
+
+        [Fact]
+        public void LoneHolesAndSinglePickSelectorsAreLeftToTheGame()
+        {
+            Assert.Empty(Bulk.Click(new[] { 0 }, i => false, i => true, 0, 16).Others);
+            Assert.Empty(Bulk.Click(new[] { 0, 1 }, i => false, i => true, 0, 1).Others);
+            Assert.Empty(Bulk.Click(null, i => false, i => true, 0, 16).Others);
+        }
+
+        [Fact]
+        public void EveryTrayFillsWholeTraysBeforeSplittingOne()
+        {
+            // Room for 8: the nearest tray (5) fits, the next (12) doesn't, the third (3) does; nothing left to split the 12.
+            var trays = new[] { new[] { 0, 1, 2, 3, 4 }, Enumerable.Range(10, 12).ToArray(), new[] { 30, 31, 32 } };
+            Assert.Equal(new[] { 0, 1, 2, 3, 4, 30, 31, 32 }, Bulk.FillAll(trays, 8));
+            // Room for 10: 5 + 3 whole, then 2 from the tower that didn't fit.
+            Assert.Equal(new[] { 0, 1, 2, 3, 4, 30, 31, 32, 10, 11 }, Bulk.FillAll(trays, 10));
+            Assert.Equal(20, Bulk.FillAll(trays, 24).Count);
+            Assert.Empty(Bulk.FillAll(trays, 0));
+            Assert.Empty(Bulk.FillAll(trays, -3));
+        }
+
+        [Fact]
+        public void TheHintKeepsTheGamesTitle()
+            => Assert.StartsWith("Assign pots [hole:", Bulk.Hint("Assign pots"));
+    }
 }
