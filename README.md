@@ -6,7 +6,7 @@ share is compiled into each of them, never shipped as a separate library.
 
 | Mod | What it does | Status |
 |---|---|---|
-| [Paper Trail](PaperTrail/README.md) | Save/load manager: rolling auto-saves at safe moments, every save kept and loadable from the main menu or pause menu, and backups of each slot. | 0.3.0 |
+| [Paper Trail](PaperTrail/README.md) | Save/load manager: rolling auto-saves at safe moments, every save kept and loadable from the main menu or pause menu, and backups of each slot. | 0.4.0 |
 
 Looking for the fixes for other people's mods? Those are
 [Schedule I Unofficial Mod Fixes (S1UMF)](https://github.com/r-melvin/S1UMF).

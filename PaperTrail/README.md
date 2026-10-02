@@ -12,9 +12,6 @@ menu or the pause menu, and backs a slot up before anything replaces what is in 
 - **Optional:** [Mod Manager & Phone App](https://www.nexusmods.com/schedule1/mods/397), to change the settings in game.
 - **Download:** [releases](https://github.com/r-melvin/Melange/releases?q=paper-trail) (tagged `paper-trail-v*`).
 
-> This page describes Paper Trail 0.4.0, the next release: slot backups, and the icons on each save for rename,
-> pin, export and delete. 0.3.0 has archived campaigns in place of backups.
-
 ## What it does
 
 ### Saves you never asked for, at moments that matter
