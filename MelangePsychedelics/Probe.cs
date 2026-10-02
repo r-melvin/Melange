@@ -15,7 +15,8 @@ namespace Melange.Psychedelics
     {
         public override string CommandWord => "psy";
         public override string CommandDescription => "Melange Psychedelics probes: status, pond, catch [spot] [force], randy <terrarium|crickets|net|toad>, " +
-                                                     "terra <place|add|milk|night [day]>, frame <place|add>, ana unlock, dose [design], trip <good|bad> [design]";
+                                                     "terra <place|add|milk|night [day]|days <n> [feed]|cycle <n> [feed]>, frame <place|add>, ana unlock, dose [design], " +
+                                                     "trip <good|bad> [design], sell <toad|lsd> [design] [contract], ergot [plant|grow|harvest|status]";
         public override string ExampleUsage => "psy status";
 
         public override void ExecuteCommand(List<string> args)
@@ -62,7 +63,9 @@ namespace Melange.Psychedelics
                         case "add": return Terraria.ProbeAdd();
                         case "milk": return Terraria.ProbeMilk();
                         case "night": return Terraria.ProbeNight(args.Count > 1 ? args[1] : null);
-                        default: return "terra <place|add|milk|night [day]>";
+                        case "days": return Terraria.ProbeDays(args, false);
+                        case "cycle": return Terraria.ProbeDays(args, true);
+                        default: return "terra <place|add|milk|night [day]|days <n> [feed]|cycle <n> [feed]>";
                     }
                 case "frame":
                     switch (a0)
@@ -81,8 +84,23 @@ namespace Melange.Psychedelics
                 }
                 case "trip":
                     return Trip(data, a0, args.Count > 1 ? string.Join(" ", args.GetRange(1, args.Count - 1)) : null);
+                case "sell":
+                {
+                    bool contract = args.Exists(x => x.Equals("contract", StringComparison.OrdinalIgnoreCase));
+                    var rest = args.FindAll(x => !x.Equals("contract", StringComparison.OrdinalIgnoreCase));
+                    Design design = null;
+                    if (rest.Count > 1)
+                    {
+                        string name = string.Join(" ", rest.GetRange(1, rest.Count - 1));
+                        if (a0 != "lsd") return "a design only goes with lsd";
+                        if ((design = FindDesign(data, name)) == null) return $"no design '{name}' ({DesignIds(data)})";
+                    }
+                    return Brands.ProbeSell(data, a0, design, contract);
+                }
+                case "ergot":
+                    return Ergot.Probe(a0);
                 default:
-                    return "unknown; psy status|pond|catch|randy|terra|frame|ana|dose|trip";
+                    return "unknown; psy status|pond|catch|randy|terra|frame|ana|dose|trip|sell|ergot";
             }
         }
 

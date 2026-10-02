@@ -55,6 +55,8 @@ namespace Melange.Smuggling
             Tanker.Forget();
             Dafydd.Forget();
             _noProductSaid = false;
+            _forcedRisk = null;
+            LastRoll = "no delivery yet";
         }
 
         private static void OnSaveLoaded()
@@ -236,10 +238,18 @@ namespace Melange.Smuggling
 
             bool via = ViaRoute();
             float risk = Risk.PoliceRisk(units, TimeOfDay(), via, _rules);
+            float? forced = _forcedRisk;                             // TEST ONLY: the probe's "risk" override, one delivery
+            _forcedRisk = null;
+            if (forced.HasValue) risk = Risk.Forced(forced.Value, via, _rules);
             Cargo.Take(picks);
             units = 0;
             foreach (var p in picks) units += p.Units;              // a stack that couldn't be taken counts for nothing
-            if (Risk.Seized(risk, Rng.NextDouble()))
+            double roll = Rng.NextDouble();
+            bool seized = Risk.Seized(risk, roll);
+            LastRoll = $"roll {roll:0.000} vs risk {risk:0.000}{(forced.HasValue ? $" (FORCED street {forced.Value:0.00}, test only)" : "")}, " +
+                       $"route known {s.RouteKnown}, via {via}, {(seized ? "SEIZED" : "passed")}";
+            Mod.Log.Msg($"delivery police roll: {LastRoll}");
+            if (seized)
             {
                 s.Seizures++;
                 Mod.Log.Msg($"delivery of {units} seized (risk {Risk.Percent(risk)})");
@@ -250,6 +260,12 @@ namespace Melange.Smuggling
             Mod.Log.Msg($"loaded {units} (risk {Risk.Percent(risk)}{(via ? ", via the route" : "")}), {s.UnitsAboard}/{s.Order.Units} aboard");
             return Lines.Loaded(units, s.UnitsAboard, s.Order.Units, risk, via);
         }
+
+        /// <summary>TEST ONLY: a street risk the next delivery uses instead of the computed one (set by the probe's "risk").</summary>
+        private static float? _forcedRisk;
+
+        /// <summary>The last delivery's police roll, for the probes.</summary>
+        internal static string LastRoll { get; private set; } = "no delivery yet";
 
         private static bool ViaRoute() => State != null && Risk.ViaRoute(State.RouteKnown, Route.SecondsSinceOnRoute, Route.DroveSince, _rules);
 
@@ -312,8 +328,12 @@ namespace Melange.Smuggling
 
         // ---- probes (SmugglingCommand) ----
 
-        public static string Probe(string what, string arg)
+        public const string ProbeUsage = "status, oscar <spend>, unlock, order, accept, decline, load, sail, return, collect, imports, import <item> [crates], " +
+                                         "route [known|unknown|walked], risk <0..1|off> (test only), tanker, boat";
+
+        public static string Probe(string what, List<string> args)
         {
+            string arg = args != null && args.Count > 0 ? args[0] : null;
             if (!Host.IsHost) return "host only";
             var s = State;
             if (s == null) return "no save loaded (or no smuggling data)";
@@ -349,9 +369,59 @@ namespace Melange.Smuggling
                     Answer(s.Order.Id, what == "accept");
                     return s.Order == null ? "declined" : s.Order.Answer.ToString();
                 case "load":
-                    return LoadHold();
+                {
+                    string rollBefore = LastRoll;
+                    string said = LoadHold();
+                    return $"{said} [{(ReferenceEquals(rollBefore, LastRoll) ? "no roll" : LastRoll)}]";
+                }
                 case "collect":
-                    return CollectImports();
+                {
+                    // the boat prompt's and Dafydd's "collect" path; reports what reached the pockets and the room left
+                    string before = ImportList(s.ImportsWaiting);
+                    var counts = new Dictionary<string, int>();
+                    foreach (var l in s.ImportsWaiting) counts[l.ItemId] = Cargo.CountOnPlayer(l.ItemId);
+                    int freeBefore = Cargo.FreePocketSlots();
+                    string said = CollectImports();
+                    var got = new List<string>();
+                    foreach (var kv in counts) got.Add($"{kv.Key} {kv.Value} -> {Cargo.CountOnPlayer(kv.Key)}");
+                    return $"{said} | waiting before [{before}], after [{ImportList(s.ImportsWaiting)}] | pockets [{string.Join(", ", got)}], " +
+                           $"free slots {freeBefore} -> {Cargo.FreePocketSlots()}";
+                }
+                case "imports":
+                {
+                    var money = NetworkSingleton<MoneyManager>.Instance;
+                    var offers = new List<string>();
+                    foreach (var (offer, name) in _imports)
+                        offers.Add($"{offer.ItemId} \"{name}\": crate of {offer.Crate} at ${offer.UnitPrice:0.##} each, ${Imports.CratePrice(offer, s.Reputation, _rules):0} a crate now");
+                    string open = Imports.Open(s, _rules) ? "open"
+                        : $"closed (unlocked {s.Unlocked}, runs paid {s.RunsPaid}/{_rules.ImportsAfterRuns} needed, boat {s.Boat})";
+                    return $"{open}; reputation {s.Reputation} (discount up to {_rules.MaxImportDiscount:P0}); cash ${(money == null ? 0f : money.cashBalance):0}; " +
+                           $"offered [{string.Join("; ", offers)}]; ordered [{ImportList(s.ImportsOrdered)}]; waiting [{ImportList(s.ImportsWaiting)}]";
+                }
+                case "import":
+                {
+                    if (arg == null) return "import <item> [crates]; see 'smuggling imports'";
+                    int crates = 1;
+                    if (args.Count > 1 && (!int.TryParse(args[1], out crates) || crates < 1 || crates > 20)) return "crates: 1-20";
+                    int found = FindImport(arg);
+                    if (found < 0) return $"no import '{arg}' (offered: {string.Join(", ", _imports.ConvertAll(i => i.Offer.ItemId))})";
+                    var (offer, name) = _imports[found];
+                    var money = NetworkSingleton<MoneyManager>.Instance;
+                    float cash = money == null ? 0f : money.cashBalance;
+                    var said = new List<string>();
+                    // the same call as Dafydd's "Bring something back" choice (msm_imp_<i> in Dafydd.Wire), once per crate
+                    for (int i = 0; i < crates; i++) said.Add(BuyImport(offer, name));
+                    float after = money == null ? 0f : money.cashBalance;
+                    return $"{string.Join(" | ", said)} | cash ${cash:0} -> ${after:0}; ordered [{ImportList(s.ImportsOrdered)}] (lands on the next return)";
+                }
+                case "risk":
+                    // TEST ONLY: forces the street police risk of the next delivery (the route multiplier still applies)
+                    if (arg == null) return $"forced {(_forcedRisk.HasValue ? _forcedRisk.Value.ToString("0.00") : "none")}; last {LastRoll}";
+                    if (arg == "off") { _forcedRisk = null; return "forced risk cleared"; }
+                    if (!float.TryParse(arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float forced) || forced < 0f || forced > 1f)
+                        return "risk <0..1|off>";
+                    _forcedRisk = forced;
+                    return $"TEST ONLY: the next delivery's street risk is forced to {forced:0.00} (x{_rules.RouteRiskMultiplier:0.##} via the route); one delivery, then back to normal";
                 case "sail":
                     if (s.Order == null) return "no order to sail with";
                     s.Order.DepartsAt = now;
@@ -361,9 +431,12 @@ namespace Melange.Smuggling
                     if (s.Boat != BoatPhase.Away) return "the boat is in";
                     s.BoatBackAt = now;
                     Advance();
-                    return $"boat {s.Boat}, imports waiting {s.ImportsWaiting.Count}";
+                    return $"boat {s.Boat}, imports waiting [{ImportList(s.ImportsWaiting)}]";
                 case "route":
                     if (arg == "known") s.RouteKnown = true;     // for testing without the sewer spoke; the real fact comes from the hub event
+                    else if (arg == "unknown") s.RouteKnown = false;   // TEST ONLY: undoes "known" (saved with the game)
+                    else if (arg == "walked") Route.PretendWalked();   // TEST ONLY: as if just off the route on foot
+                    else if (arg != null) return "route [known|unknown|walked]";
                     var me = Il2CppScheduleOne.PlayerScripts.Player.Local;
                     var p = me != null ? me.transform.position : UnityEngine.Vector3.zero;
                     return $"known {s.RouteKnown}; at ({p.x:0.0},{p.y:0.0},{p.z:0.0}) on route {Quay.OnRoute(p.x, p.y, p.z)}; " +
@@ -373,8 +446,20 @@ namespace Melange.Smuggling
                 case "boat":
                     return Boat.Describe();
                 default:
-                    return "unknown; try status, oscar <spend>, unlock, order, accept, decline, load, sail, return, collect, route [known], tanker, boat";
+                    return "unknown; try " + ProbeUsage;
             }
+        }
+
+        private static string ImportList(List<ImportLine> lines)
+            => string.Join(", ", lines.ConvertAll(l => $"{l.Quantity} x {l.ItemId} (${l.Paid:0})"));
+
+        /// <summary>An offer by item ID, else by a name that contains the words (case and spacing ignored).</summary>
+        private static int FindImport(string want)
+        {
+            string w = want.Replace(" ", "").ToLowerInvariant();
+            for (int i = 0; i < _imports.Count; i++) if (string.Equals(_imports[i].Offer.ItemId, want, StringComparison.OrdinalIgnoreCase)) return i;
+            for (int i = 0; i < _imports.Count; i++) if ((_imports[i].Name ?? "").Replace(" ", "").ToLowerInvariant().Contains(w)) return i;
+            return -1;
         }
 
         internal static void Notify(string title, string text)

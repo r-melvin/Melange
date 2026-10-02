@@ -99,6 +99,22 @@ namespace Melange.Smuggling
             return given;
         }
 
+        /// <summary>How many of an item the local player carries (for the probes).</summary>
+        public static int CountOnPlayer(string itemId)
+        {
+            var inv = PlayerSingleton<PlayerInventory>.Instance;
+            return inv == null ? 0 : (int)inv.GetAmountOfItem(itemId);
+        }
+
+        /// <summary>Empty pocket (hotbar) slots, the cash slot not counted (for the probes).</summary>
+        public static int FreePocketSlots()
+        {
+            var slots = PlayerSingleton<PlayerInventory>.Instance?.hotbarSlots;
+            int n = 0;
+            for (int i = 0; slots != null && i < slots.Count; i++) if (slots[i] != null && slots[i].ItemInstance == null) n++;
+            return n;
+        }
+
         /// <summary>The item's display name, or its ID when the game doesn't know it.</summary>
         public static string NameOf(string itemId)
         {

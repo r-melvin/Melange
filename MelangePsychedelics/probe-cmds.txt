@@ -75,3 +75,55 @@ psy trip bad sunburst
 psy trip good
 wait 1
 psy status
+
+# ---- Day cycles, a real customer, ergot (one session) ----
+# "terra days <n> [feed]" runs the midnight step for n consecutive days from the first the tank hasn't been fed;
+# "terra cycle <n> [feed]" milks then runs the night, each day. "feed" tops the tray up to a day's crickets before each night
+# (without it the toads eat what's in the tray, then go hungry and starve after 4 days). Venom milked goes to the pockets.
+# The day numbers run ahead of the game's clock (the clock doesn't move); the result line lists births, dust and starvation
+# per day. Defaults: capacity 6, breed every 3 days with 2+ fed toads, dust on the 10th milking.
+
+# Breeding: 3 toads, 4 days fed -> one toadlet (born on the 3rd night)
+give melange_psy_live_toad 3
+psy terra add
+wait 2
+psy terra days 4 feed
+wait 1
+# The milking limit: milk + night for 10 days, fed -> the original toads turn to dust on their 10th milking
+psy terra cycle 10 feed
+wait 1
+psy status
+# Hunger: 5 nights with no crickets added (whatever is left in the tray is eaten first) -> hungry, then starved
+psy terra days 5
+
+# A real customer: one tab handed to the nearest conscious customer through the game's consumption call (the end of a
+# handover), so OnNpcTrip runs with that customer: the design's reputation and the relationship change. Look for
+# "trip: <customer name>, batch ..." and, ~10 s later, "PROBE sell after: <name> relationship a -> b; design ...".
+# Needs the P9 section above (a dosed sunburst batch). Stand near a customer first.
+psy sell lsd sunburst
+wait 12
+psy sell lsd
+wait 12
+# Toad venom has no brand: it only exercises the NPC consuming it (expect no "trip:" line)
+psy sell toad
+wait 12
+# Through a customer's current contract instead (only if one has a deal on; non-player handover: completes, pays nobody)
+psy sell lsd contract
+wait 12
+
+# Ergot: ergot spawn into the nearest empty mushroom bed (one is placed in an owned property if none is empty), grown
+# to 100%, harvested, then the colony's spawn ID as its save would write it. Expect "ergot colony in bed <guid>" (the
+# CreateAndAssignColony patch) and "saved spawn ID 'melange_psy_ergot_spawn' (ergot: reloads as ergot)".
+# Step by step (each step reads the previous one's result after the host's network tick):
+psy ergot plant
+wait 3
+psy ergot plant
+wait 2
+psy ergot status
+psy ergot grow
+wait 2
+psy ergot status
+psy ergot harvest
+wait 2
+psy ergot status
+# or all four in one go, a second or two apart: "psy ergot"

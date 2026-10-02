@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using HarmonyLib;
 using Il2CppScheduleOne.ItemFramework;
 using Il2CppScheduleOne.ObjectScripts;
@@ -183,6 +184,174 @@ namespace Melange.Psychedelics
                 Mod.Log.Msg($"ergot colony in bed {__instance.GUID}");
             }
             catch (Exception e) { Mod.Log.Warning("ergot colony: " + e.Message); }
+        }
+
+        // ------------------------------------------------------------------ probes (Probe.cs, host only)
+
+        /// <summary>
+        /// <c>psy ergot [plant|grow|harvest|status]</c>; no step runs all four a second apart (the game's calls here are
+        /// server RPCs, which the host runs on its next network tick, so each step reads the last one's result).
+        /// </summary>
+        internal static string Probe(string step)
+        {
+            switch (step)
+            {
+                case null:
+                case "all":
+                    MelonLoader.MelonCoroutines.Start(ProbeAll());
+                    return "plant, grow, harvest and status follow a second or two apart (PROBE ergot <step> lines)";
+                case "plant": return ProbePlant();
+                case "grow": return ProbeGrow();
+                case "harvest": return ProbeHarvest();
+                case "status": return ProbeStatus();
+                default: return "ergot [plant|grow|harvest|status]";
+            }
+        }
+
+        private static System.Collections.IEnumerator ProbeAll()
+        {
+            foreach (var step in new[] { "plant", "grow", "harvest", "status" })
+            {
+                string result;
+                try { result = Probe(step); }
+                catch (Exception e) { result = "threw: " + e; }
+                Mod.Log.Msg($"PROBE ergot {step}: {result}");
+                float until = Time.realtimeSinceStartup + (step == "plant" && result.StartsWith("placed") ? 3f : 1.5f);
+                while (Time.realtimeSinceStartup < until) yield return null;
+                if (step == "plant" && result.StartsWith("placed"))
+                {
+                    try { result = ProbePlant(); } catch (Exception e) { result = "threw: " + e; }
+                    Mod.Log.Msg($"PROBE ergot plant: {result}");
+                    until = Time.realtimeSinceStartup + 1.5f;
+                    while (Time.realtimeSinceStartup < until) yield return null;
+                }
+            }
+        }
+
+        /// <summary>Mushroom beds nearest the local player first.</summary>
+        private static List<MushroomBed> Beds()
+        {
+            var list = new List<MushroomBed>();
+            foreach (var b in Object.FindObjectsOfType<MushroomBed>()) if (b != null) list.Add(b);
+            var me = Il2CppScheduleOne.PlayerScripts.Player.Local;
+            if (me != null)
+            {
+                var p = me.transform.position;
+                list.Sort((a, b) => (a.transform.position - p).sqrMagnitude.CompareTo((b.transform.position - p).sqrMagnitude));
+            }
+            return list;
+        }
+
+        private static bool IsErgot(MushroomBed b)
+        {
+            var c = b.CurrentColony;
+            return c != null && (c._spawnDefinition?.ID == Ids.ErgotSpawn || c.GetSaveData()?.MushroomSpawnID == Ids.ErgotSpawn);
+        }
+
+        /// <summary>The nearest bed growing ergot (a player's shroom colony is never touched by the probes), or null.</summary>
+        private static MushroomBed Colonised()
+        {
+            foreach (var b in Beds()) if (IsErgot(b)) return b;
+            return null;
+        }
+
+        /// <summary>The game's mushroom bed item, found by what it builds (the ID isn't hard-coded).</summary>
+        private static string BedItemId()
+        {
+            var all = Il2CppScheduleOne.Registry.Instance?.GetAllItems();
+            for (int i = 0; all != null && i < all.Count; i++)
+            {
+                var def = all[i]?.TryCast<BuildableItemDefinition>();
+                if (def?.BuiltItem != null && def.BuiltItem.GetComponent<MushroomBed>() != null) return def.ID;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Ergot spawn into the nearest empty bed (placing one in an owned property if there is none) through the call the
+        /// player's spawn task ends with (ApplyShroomSpawnTask.Success): one spawn out of the pockets if there is one, the
+        /// soil shown full of spores, then <c>MushroomBed.CreateAndAssignColony_Server(spawnId)</c>, whose server side runs
+        /// CreateAndAssignColony, the patched method. The pour-and-mix minigame itself is skipped.
+        /// </summary>
+        private static string ProbePlant()
+        {
+            if (!Settings.ErgotGrowing) return "ergot growing is off in the settings (ErgotGrowing)";
+            var spawn = Il2CppScheduleOne.Registry.GetItem(Ids.ErgotSpawn)?.TryCast<ShroomSpawnDefinition>();
+            if (spawn == null) return $"{Ids.ErgotSpawn} is not registered as a shroom spawn (see the 'ergot:' load lines)";
+            MushroomBed bed = null;
+            foreach (var b in Beds()) if (b.CurrentColony == null) { bed = b; break; }
+            if (bed == null)
+            {
+                string id = BedItemId();
+                if (id == null) return "no empty mushroom bed and no mushroom bed item in the registry";
+                return Placed.PlaceOnGrid(id) + " (no empty bed was found: run 'psy ergot plant' again once it has spawned)";
+            }
+            var inv = Il2CppScheduleOne.DevUtilities.PlayerSingleton<Il2CppScheduleOne.PlayerScripts.PlayerInventory>.Instance;
+            bool fromPockets = inv != null && inv.GetAmountOfItem(Ids.ErgotSpawn) > 0;
+            if (fromPockets) inv.RemoveAmountOfItem(Ids.ErgotSpawn, 1);
+            bed.ConfigureSoilAppearance(MushroomBed.EMushroomBedSoilAppearance.FullSpores);
+            bed.CreateAndAssignColony_Server(Ids.ErgotSpawn);
+            var at = bed.transform.position;
+            return $"bed {bed.GUID} at ({at.x:0.0},{at.y:0.0},{at.z:0.0}): CreateAndAssignColony_Server({Ids.ErgotSpawn}) sent, " +
+                   $"{(fromPockets ? "one spawn taken from the pockets" : "no ergot spawn in the pockets: planted without one")}; " +
+                   "expect 'ergot colony in bed <guid>' from the patch, then 'psy ergot status'";
+        }
+
+        /// <summary>The game's own SetFullyGrown (a server RPC) on the nearest ergot colony: growth to 100% now.</summary>
+        private static string ProbeGrow()
+        {
+            var bed = Colonised();
+            if (bed == null) return "no bed growing ergot (psy ergot plant; psy ergot status lists every colony)";
+            var c = bed.CurrentColony;
+            float before = c.GrowthProgress;
+            c.SetFullyGrown();
+            return $"bed {bed.GUID}: SetFullyGrown sent (growth was {before:P0}, too hot {c.IsTooHotToGrow}); 'psy ergot status' shows it";
+        }
+
+        /// <summary>
+        /// Every grown mushroom picked with GrowingMushroom.Harvest, the method the player's harvest task calls per mushroom
+        /// (it puts the colony's GetHarvestedShroom into the pockets and removes the mushroom), while the pockets have room.
+        /// </summary>
+        private static string ProbeHarvest()
+        {
+            var bed = Colonised();
+            if (bed == null) return "no bed growing ergot (psy ergot plant; psy ergot status lists every colony)";
+            var c = bed.CurrentColony;
+            if (!bed.IsReadyForHarvest(out string reason)) return $"bed {bed.GUID} not ready: {reason}";
+            var inv = Il2CppScheduleOne.DevUtilities.PlayerSingleton<Il2CppScheduleOne.PlayerScripts.PlayerInventory>.Instance;
+            var sample = c.GetHarvestedShroom(1);
+            string harvestedId = sample?.ID ?? "null";
+            int ergotBefore = Items.Count(Ids.Ergot), vanillaBefore = _vanillaShroom == null ? 0 : Items.Count(_vanillaShroom.ID);
+            var shrooms = new List<Il2CppScheduleOne.Growing.GrowingMushroom>();
+            var list = c._growingShrooms;
+            for (int i = 0; list != null && i < list.Count; i++) if (list[i] != null) shrooms.Add(list[i]);
+            int picked = 0;
+            foreach (var m in shrooms)
+            {
+                if (inv == null || !inv.CanItemFitInInventory(c.GetHarvestedShroom(1), 1)) break;
+                m.Harvest();
+                picked++;
+            }
+            return $"bed {bed.GUID}: picked {picked}/{shrooms.Count}, harvest item '{harvestedId}' ({(harvestedId == Ids.Ergot ? "ergot" : "NOT ergot")}); " +
+                   $"pockets ergot {ergotBefore} -> {Items.Count(Ids.Ergot)}" +
+                   (_vanillaShroom == null ? "" : $", {_vanillaShroom.ID} {vanillaBefore} -> {Items.Count(_vanillaShroom.ID)}");
+        }
+
+        /// <summary>Every colonised bed: the spawn its colony holds, the spawn ID its save line would carry, growth and mushrooms.</summary>
+        private static string ProbeStatus()
+        {
+            var lines = new List<string>();
+            int empty = 0;
+            foreach (var b in Beds())
+            {
+                var c = b.CurrentColony;
+                if (c == null) { empty++; continue; }
+                var save = c.GetSaveData();
+                lines.Add($"bed {b.GUID}: colony spawn '{c._spawnDefinition?.ID}', saved spawn ID '{save?.MushroomSpawnID}' " +
+                          $"({(save?.MushroomSpawnID == Ids.ErgotSpawn ? "ergot: reloads as ergot" : "not ergot")}), growth {c.GrowthProgress:P0}, " +
+                          $"grown {c.IsFullyGrown}, mushrooms {c._growingShrooms?.Count ?? 0}, too hot {c.IsTooHotToGrow}, harvests '{c.GetHarvestedShroom(1)?.ID}'");
+            }
+            return $"{lines.Count} colonised bed(s), {empty} empty" + (lines.Count > 0 ? ": " + string.Join("; ", lines) : "");
         }
     }
 }

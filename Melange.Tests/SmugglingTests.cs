@@ -370,6 +370,19 @@ namespace Melange.Tests
             Assert.Equal(0.5f, Risk.PoliceRisk(10, 2300, false, r));
         }
 
+        [Fact]
+        public void AForcedRiskSeizesOffTheRouteAndNeverOnIt()
+        {
+            float street = Risk.Forced(1f, false, R), route = Risk.Forced(1f, true, R);
+            Assert.Equal(1f, street);
+            Assert.Equal(0f, route);
+            Assert.True(Risk.Seized(street, 0.999999));                       // a forced 1 seizes on any roll
+            Assert.False(Risk.Seized(route, 0.0));
+            Assert.Equal(0.1f, Risk.Forced(0.4f, true, new SmugglingRules { RouteRiskMultiplier = 0.25f }), 4);
+            Assert.Equal(1f, Risk.Forced(7f, false, R));
+            Assert.Equal(0f, Risk.Forced(-1f, false, R));
+        }
+
         [Theory]
         [InlineData(0.05f, 0.04, true)]
         [InlineData(0.05f, 0.051, false)]

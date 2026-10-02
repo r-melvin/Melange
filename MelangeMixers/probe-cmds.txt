@@ -1,0 +1,56 @@
+# Melange Mixers probe script (TESTING.md P3-P8).
+# One console command per line, submitted to the game console in order; "wait N" pauses N seconds; "#" starts a comment.
+# Host or single player, on a save with an owned property other than the RV. Nothing goes through the pockets: "load"
+# creates the product and mixers straight in the machine's slots and the output stays in the machine.
+# Every "mixers" line logs "PROBE <what>: <result>" to the Melange_Mixers logger in MelonLoader/Latest.log.
+# The commands act on the Melange mixer nearest the player.
+
+mixers status
+changecash 20000
+wait 1
+
+# P3: a Three-Ingredient Mixer on free floor (skip if the save already has one)
+mixers place 3
+wait 3
+mixers status
+
+# P4/P5: product and three mixers, slot 2 short (7): the batch must be 7, slots 2 and 3 locked while it runs
+mixers load ogkush 10 cuke banana:7 paracetamol
+wait 1
+mixers start
+wait 1
+mixers status
+
+# P6/P7: fast-forward. A first-time chain is a new product: no output until it is named
+mixers finish
+wait 3
+mixers status
+mixers output
+mixers name Probe Kush
+wait 3
+mixers output
+mixers status
+
+# P6: the same chain again is now a known product: output straight away, no naming, compared with three Mk2 passes
+mixers load ogkush 5 cuke banana paracetamol
+wait 1
+mixers start
+wait 1
+mixers finish
+wait 3
+mixers output
+mixers status
+
+# P8: chemists. Stock the machine (not started), hire a chemist through Manny if there is none, assign the machine
+mixers load ogkush 10 cuke banana paracetamol
+wait 1
+mixers employee
+mixers employee hire
+wait 5
+mixers employee
+mixers employee assign
+wait 2
+mixers employee
+# give the chemist time to walk over and start it (the log shows "mixing ..." from the spoke when he does)
+wait 60
+mixers status

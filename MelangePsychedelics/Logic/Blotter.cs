@@ -168,14 +168,34 @@ namespace Melange.Psychedelics
         /// </summary>
         public Batch Attribute(int tier)
         {
+            var b = Peek(tier);
+            if (b != null && b.Tabs > 0) b.Tabs--;
+            return b;
+        }
+
+        /// <summary>The batch <see cref="Attribute"/> would pick for this quality, without taking a tab off it.</summary>
+        public Batch Peek(int tier)
+        {
             Batch newest = null;
             foreach (var b in Batches)
             {
                 if (b.Tier != tier) continue;
-                if (b.Tabs > 0) { b.Tabs--; return b; }
+                if (b.Tabs > 0) return b;
                 newest = b;
             }
             return newest;
+        }
+
+        /// <summary>
+        /// The quality a tab of this design would have to be for <see cref="Attribute"/> to put it down to the design: the tier of
+        /// the first of its batches that the ledger would pick at that tier (-1 when none would: no batch of the design, or an
+        /// older batch of another design at each of its tiers comes first).
+        /// </summary>
+        public int TierFor(string designId)
+        {
+            foreach (var b in Batches)
+                if (b.DesignId == designId && Peek(b.Tier) == b) return b.Tier;
+            return -1;
         }
 
         /// <summary>Keeps the ledger bounded: the oldest used-up batches go first, then the oldest of all.</summary>

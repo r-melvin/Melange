@@ -134,39 +134,45 @@ namespace Melange.Psychedelics
             try
             {
                 var rules = Rules;
-                foreach (var b in Placed.All(Ids.Terrarium))
-                {
-                    var s = Placed.Storage(b);
-                    if (s == null) continue;
-                    string guid = Placed.Guid(b);
-                    var t = Data.TerrariumFor(guid);
-                    if (t.Count == 0) continue;
-                    var r = Husbandry.Feed(t, Placed.Count(s, Ids.Crickets), day, rules);
-                    if (r.Skipped) continue;
-                    Placed.Take(s, Ids.Crickets, r.FeedEaten);
-                    Mod.Log.Msg($"terrarium {guid} day {day}: ate {r.FeedEaten}, fed {r.Fed}, hungry {r.Hungry}, starved {r.Starved}, born {r.Born}, now {t.Count}");
-                    if (r.Born > 0) Items.Notify("Toadlet", "A toad was born in a terrarium.");
-                    if (r.Starved > 0) Items.Notify("Toad starved", $"{r.Starved} toad(s) died: keep crickets in the terrarium.");
-                    else if (r.Hungry > 0) Items.Notify("Hungry toads", $"{r.Hungry} toad(s) went without crickets last night.");
-                }
+                foreach (var b in Placed.All(Ids.Terrarium)) Night(b, day, rules);
                 _warnedFull.Clear();
             }
             catch (Exception e) { Mod.Log.Warning("terrarium day: " + e.Message); }
         }
 
+        /// <summary>One terrarium's midnight step for a day; null when it has no storage or no toads, or was fed that day.</summary>
+        private static FeedReport Night(BuildableItem b, int day, TerrariumRules rules)
+        {
+            var s = Placed.Storage(b);
+            if (s == null) return null;
+            string guid = Placed.Guid(b);
+            var t = Data.TerrariumFor(guid);
+            if (t.Count == 0) return null;
+            var r = Husbandry.Feed(t, Placed.Count(s, Ids.Crickets), day, rules);
+            if (r.Skipped) return null;
+            Placed.Take(s, Ids.Crickets, r.FeedEaten);
+            Mod.Log.Msg($"terrarium {guid} day {day}: ate {r.FeedEaten}, fed {r.Fed}, hungry {r.Hungry}, starved {r.Starved}, born {r.Born}, now {t.Count}");
+            if (r.Born > 0) Items.Notify("Toadlet", "A toad was born in a terrarium.");
+            if (r.Starved > 0) Items.Notify("Toad starved", $"{r.Starved} toad(s) died: keep crickets in the terrarium.");
+            else if (r.Hungry > 0) Items.Notify("Hungry toads", $"{r.Hungry} toad(s) went without crickets last night.");
+            return r;
+        }
+
         /// <summary>The lid prompt: venom from every toad not milked today, into the tank's slots (or the player's pockets).</summary>
-        private static void Milk(BuildableItem b, string guid)
+        private static void Milk(BuildableItem b, string guid) => Milk(b, guid, Placed.Day);
+
+        /// <summary>Milking on a given day (the prompt: today; the probes' day cycle: the day being run). Null when nothing was milked.</summary>
+        private static MilkReport Milk(BuildableItem b, string guid, int day)
         {
             try
             {
-                if (!Host.IsHost) { Items.Notify("Terrarium", "Only the host can milk toads in this version."); return; }
-                if (Data == null || b == null) return;
+                if (!Host.IsHost) { Items.Notify("Terrarium", "Only the host can milk toads in this version."); return null; }
+                if (Data == null || b == null) return null;
                 var rules = Rules;
                 var t = Data.TerrariumFor(guid);
-                if (t.Count == 0) { Items.Notify("Terrarium", "No toads in here. Put a toad in the tank's tray."); return; }
-                int day = Placed.Day;
+                if (t.Count == 0) { Items.Notify("Terrarium", "No toads in here. Put a toad in the tank's tray."); return null; }
                 var r = Husbandry.Milk(t, day, rules);
-                if (r.Tiers.Count == 0) { Items.Notify("Terrarium", "They've all been milked today."); return; }
+                if (r.Tiers.Count == 0) { Items.Notify("Terrarium", "They've all been milked today."); return r; }
                 var s = Placed.Storage(b);
                 int lost = 0;
                 var byTier = new int[5];
@@ -181,8 +187,9 @@ namespace Melange.Psychedelics
                 string spill = lost > 0 ? $" {lost} went to waste: no room." : "";
                 Items.Notify("Milked", $"{r.Tiers.Count} venom.{dust}{spill}");
                 Mod.Log.Msg($"terrarium {guid}: milked {r.Tiers.Count} (tiers {string.Join(",", r.Tiers)}), dust {r.Dust}, lost {lost}, left {t.Count}");
+                return r;
             }
-            catch (Exception e) { Mod.Log.Warning("milking: " + e.Message); }
+            catch (Exception e) { Mod.Log.Warning("milking: " + e.Message); return null; }
         }
 
         // ------------------------------------------------------------------ probes (Probe.cs, host only)
@@ -243,6 +250,79 @@ namespace Melange.Psychedelics
             foreach (var b in Placed.All(Ids.Terrarium)) if (Data.TerrariumFor(Placed.Guid(b)).LastFedDay == day) skipped++;
             OnDayPassed(day);
             return $"day {day}{(skipped > 0 ? $" ({skipped} already fed that day: skipped; pass a later day)" : "")}; {ProbeStatus()}";
+        }
+
+        /// <summary>
+        /// Several days in one go on the nearest terrarium: for each day from the first it hasn't been fed (and, milking, the first
+        /// none of its toads was milked), optionally milk (the lid prompt's milking, on that day), optionally top the tray up with
+        /// crickets to a day's feed, then the midnight step (the same one DayPassed runs). The days are the mod's own day
+        /// numbers, run ahead of the clock: the game's clock doesn't move, and the next real midnight (an earlier day number)
+        /// still runs, since a terrarium skips only the day it was last fed. Venom milked is moved to the pockets (else it
+        /// stays in the tray) so the crickets keep fitting.
+        /// </summary>
+        internal static string ProbeDays(List<string> args, bool milk)
+        {
+            int n = 0;
+            if (args.Count < 2 || !int.TryParse(args[1], out n) || n < 1 || n > 60) return $"terra {(milk ? "cycle" : "days")} <1-60> [feed]";
+            bool feed = args.Exists(x => x.Equals("feed", StringComparison.OrdinalIgnoreCase));
+            var b = Probed(out string why);
+            if (b == null) return why;
+            var s = Placed.Storage(b);
+            string guid = Placed.Guid(b);
+            var t = Data.TerrariumFor(guid);
+            var rules = Rules;
+            if (t.Count == 0) return $"no toads in the terrarium (psy terra add); {Describe(b)}";
+            int start = Math.Max(Placed.Day, t.LastFedDay + 1);
+            if (milk) foreach (var toad in t.Toads) start = Math.Max(start, toad.LastMilkedDay + 1);
+            int startCount = t.Count, milked = 0, dust = 0, born = 0, starved = 0, hungry = 0, eaten = 0, added = 0, venomOut = 0, days = 0;
+            var notes = new List<string>();
+            for (int i = 0; i < n && t.Count > 0; i++)
+            {
+                int day = start + i;
+                days++;
+                if (milk)
+                {
+                    var mr = Milk(b, guid, day);
+                    if (mr != null) { milked += mr.Tiers.Count; dust += mr.Dust; if (mr.Dust > 0) notes.Add($"day {day}: {mr.Dust} to dust"); }
+                    venomOut += VenomToPockets(s);
+                    if (t.Count == 0) break;
+                }
+                if (feed)
+                {
+                    int need = t.Count * rules.FeedPerToad - Placed.Count(s, Ids.Crickets);
+                    if (need > 0)
+                    {
+                        var tubs = Items.Make(Ids.Crickets, need);
+                        if (tubs != null && s.CanItemFit(tubs, need)) { s.InsertItem(tubs, true); added += need; }
+                        else notes.Add($"day {day}: no room for {need} cricket tub(s)");
+                    }
+                }
+                var r = Night(b, day, rules);
+                if (r == null) { notes.Add($"day {day}: night skipped"); continue; }
+                eaten += r.FeedEaten; born += r.Born; starved += r.Starved; hungry += r.Hungry;
+                if (r.Born > 0) notes.Add($"day {day}: born (now {t.Count})");
+                if (r.Starved > 0) notes.Add($"day {day}: {r.Starved} starved");
+            }
+            return $"days {start}-{start + days - 1} ({(milk ? "milk + night" : "night")}{(feed ? ", fed" : "")}): toads {startCount} -> {t.Count}; " +
+                   $"{(milk ? $"milked {milked}, dust {dust}, venom to pockets {venomOut}; " : "")}crickets added {added}, eaten {eaten}; " +
+                   $"born {born}, hungry toad-nights {hungry}, starved {starved} (milking limit {rules.MilkingsBeforeDust}, breed every {rules.EffectiveBreedDays} days, " +
+                   $"capacity {rules.Capacity}){(notes.Count > 0 ? " | " + string.Join("; ", notes) : "")} | {Describe(b)}";
+        }
+
+        /// <summary>The tray's venom into the pockets, slot by slot (each keeps its quality), while it fits.</summary>
+        private static int VenomToPockets(Il2CppScheduleOne.Storage.StorageEntity s)
+        {
+            int moved = 0;
+            for (int i = 0; s != null && i < s.ItemSlots.Count; i++)
+            {
+                var slot = s.ItemSlots[i];
+                if (slot?.ItemInstance == null || slot.ItemInstance.ID != Ids.ToadProduct || slot.Quantity <= 0) continue;
+                int k = slot.Quantity;
+                if (!Items.Give(slot.ItemInstance.GetCopy(k))) continue;
+                slot.ChangeQuantity(-k);
+                moved += k;
+            }
+            return moved;
         }
     }
 }

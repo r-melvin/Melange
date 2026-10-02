@@ -32,10 +32,15 @@ list). Each logs `PROBE <what>: <result>`. Host only.
 | `smuggling load` | one delivery, as talking to Dafydd or using the boat does |
 | `smuggling sail` | moves the deadline to now: the boat sails and pays |
 | `smuggling return` | brings the boat back now, landing any imports |
-| `smuggling collect` | collects waiting imports |
-| `smuggling route [known]` | where the player is, whether that is on the route, seconds since, drove since, and whether a delivery now would count as via the route; `known` sets the route as known without the sewer spoke |
+| `smuggling collect` | collects waiting imports (the boat's and Dafydd's collect path); reports the lines waiting before and after, each item's count on the player before and after, and free pocket slots before and after |
+| `smuggling imports` | whether imports are open (and why not), each offer with crate size, unit price and today's crate price, cash, what's ordered and what's waiting |
+| `smuggling import <item> [crates]` | buys crates (default 1) through `Smuggling.BuyImport`, the call Dafydd's "Bring something back" choice makes: cash up front, lands on the next return. `<item>` is the item ID or part of its name |
+| `smuggling risk <0..1\|off>` | TEST ONLY: forces the next delivery's street police risk (the route multiplier still applies, 0 by default); one delivery, then normal. Every delivery logs `delivery police roll: roll <r> vs risk <p> ..., route known <b>, via <b>, SEIZED\|passed`, and `smuggling load` appends it |
+| `smuggling route [known\|unknown\|walked]` | where the player is, whether that is on the route, seconds since, drove since, and whether a delivery now would count as via the route; `known` sets the route as known without the sewer spoke; TEST ONLY: `unknown` clears it, `walked` counts as just off the route on foot |
 | `smuggling tanker` | starts the experimental tanker job in 5 s (needs the setting and the methylamine item) |
 | `smuggling boat` | the berth, where the boat is now, whether it is shown, model or stand-in, prompt on or off |
+
+`probe-cmds.txt` runs unlock, an order, a load, a paid run, an import, a second run with the seizure check (route unknown vs known, forced risk 1) and the collection in one session.
 
 The game's own console commands used below: `give <item> <qty>`, `settime <hhmm>`, `teleport`, `changecash`, `addxp`.
 

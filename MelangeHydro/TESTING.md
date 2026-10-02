@@ -19,6 +19,18 @@ creates the frame's other holes (P11). The grouped path is unproven; switch to i
 
 ## Probes
 
+**Scripted probes.** The console command `hydro` (host only; `Probe.cs`) logs `PROBE <what>: <result>`: `status` (every
+hole: plant, growth, quality, buds, water and drain, medium, light, speed factors, curing; pumps and their taps; botanists
+with training and limits), `place <hydro|aero|pump>` (first free tiles of an owned property other than the RV), `sow [seed]`
+(the first empty hole, as the sow task's success: seed out of the pockets, `Pot.PlantSeed_Server`, soil packed), `grow
+<hours>` (`Pot.OnMinPass` hours x 60 times on every growing pot, vanilla ones too for comparison; the clock does not move),
+`harvest [hydro|aero]` (the first ready hole, every bud through `PlantHarvestable.Harvest` as the player's clicks),
+`cure <hours>` (the first grown aero plant's curing clock moved back an hour at a time, then one `Plant.MinPass`),
+`botanist [hire]` (the property's botanist; `hire` is Manny's `DialogueController_Fixer.Confirm`, cash taken),
+`train <16|24>` (the training choice's own handler, cash included) and `assign all` (the clipboard Reload key's fill-all on
+the closed object selector set up as his pot list, then submitted with `ObjectListField.SetList`).
+`probe-cmds.txt` is a ready-made run (one command per line, `wait N`, `#` comments).
+
 ### P1. Registration, shops, rank lock
 - Set up: load any save.
 - Log, at load: `Hydro Tray Section: registered ($450, from 'growtent', unlocks at rank 8 tier 3)`, the same for
@@ -256,3 +268,12 @@ Each has a probe above; none has been seen in the game.
   `grow medium in (20 harvests), reservoir full`; the pump `hosed to the tap 3.4 m away`. After a save and reload all three
   are back with their GUIDs; the sections' holes are in `Modded/Saveables/MelangeHydroData/holes.json` (`2 hole(s) in
   this save`), the pump in `Properties/Motel Room.json`. Growing, the botanist and the clipboard are not run yet.
+- **Growing and curing passed in game** (2026-10-02, slot 1, the `hydro` probe command): with the same seed, 540 game
+  minutes of `Pot.OnMinPass`, a vanilla Grow Tent was fully grown after 535 min (8.92 h), a Hydro Tray Section after
+  466 min (7.77 h, x1.15) and an Aeroponic Tower Section after 398 min (6.63 h, x1.35); the tower grew 18 of 24 bud sites
+  (7 on the extra sites). Curing on the tower raised quality from 0.50 (Standard) over the next hours to a peak of 0.793
+  (Premium), as the curve says. A hired botanist reports pot limit 8; training is refused below Underlord III / Baron III
+  (the test save is Bagman III), and an untrained botanist is assigned no holes by `assign all` (by design).
+- Harvesting can't be scripted: `PlantHarvestable.Harvest` called from a probe throws a NullReferenceException inside
+  the game for a vanilla Grow Tent too (the harvestable finds no Plant in its parents when called this way), so it is not
+  the mod. Harvest by hand.

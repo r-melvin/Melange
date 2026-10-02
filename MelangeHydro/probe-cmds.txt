@@ -1,0 +1,55 @@
+# Melange Hydro probe script (TESTING.md P3-P10, P14).
+# One console command per line, submitted to the game console in order; "wait N" pauses N seconds; "#" starts a comment.
+# Host or single player, on a save with an owned property other than the RV, at Baron III or above for aeroponic training
+# (below it "train 24" is refused, which is itself a check). Set Verbose = true under [MelangeHydro] for the curing lines.
+# Pockets: the player has 8 slots and already holds 3 items; this uses 2 more (the seeds, then one stack of buds per
+# harvest; buds of the same strain and quality stack).
+# Every "hydro" line logs "PROBE <what>: <result>" to the Melange_Hydro logger in MelonLoader/Latest.log.
+
+hydro status
+changecash 50000
+settime 1200
+wait 1
+
+# P3: a hydro section and an aero section on free floor (skip if the save already has them), then their medium and water
+hydro place hydro
+hydro place aero
+wait 3
+hydro status
+
+# P4: sow both (the first empty hole each time), then 4 in-game hours of the game's per-minute update
+give ogkushseed 2
+wait 1
+hydro sow ogkushseed
+wait 1
+hydro sow ogkushseed
+wait 2
+hydro grow 4
+hydro status
+# the rest of the way (hydro ~5 h 52 m, aero ~5 h 0 m from sowing)
+hydro grow 3
+wait 2
+hydro status
+
+# P10: curing on the aero plant, then P7: harvest it (bud count and quality at that point)
+hydro cure 12
+hydro harvest aero
+wait 2
+# P7: the hydro plant (12 buds expected)
+hydro harvest hydro
+wait 2
+hydro status
+
+# P8: a botanist at the property (hired through Manny if there is none), trained, then P14's "every tray"
+hydro botanist
+hydro botanist hire
+wait 5
+hydro botanist
+hydro train 16
+wait 1
+hydro train 24
+wait 1
+hydro assign all
+wait 2
+hydro botanist
+hydro status

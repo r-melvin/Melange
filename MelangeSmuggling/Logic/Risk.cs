@@ -20,6 +20,18 @@ namespace Melange.Smuggling
             return Math.Max(0f, Math.Min(0.5f, p));
         }
 
+        /// <summary>
+        /// TEST ONLY (the probe's <c>smuggling risk &lt;0..1&gt;</c>): a forced street risk for one delivery, in place of the
+        /// load-and-curfew figure, still multiplied by the route's multiplier, so a forced 1 seizes off the route and (by
+        /// default) never on it. Unlike <see cref="PoliceRisk"/> it isn't held under one half: a forced 1 always seizes.
+        /// </summary>
+        public static float Forced(float streetRisk, bool viaRoute, SmugglingRules r)
+        {
+            float p = Math.Max(0f, Math.Min(1f, streetRisk));
+            if (viaRoute) p *= r.RouteRiskMultiplier;
+            return Math.Max(0f, Math.Min(1f, p));
+        }
+
         /// <summary>A roll in [0, 1) under the risk is a seizure. Zero risk never seizes.</summary>
         public static bool Seized(float risk, double roll) => risk > 0f && roll < risk;
 

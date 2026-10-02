@@ -689,6 +689,35 @@ namespace Melange.Tests
         }
 
         [Fact]
+        public void PeekNamesTheBatchWithoutTakingATab()
+        {
+            var l = new BatchLedger();
+            var a = l.Add("preset:plain", Tier.Premium, false, 1);
+            Assert.Same(a, l.Peek(Tier.Premium));
+            Assert.Equal(1, a.Tabs);
+            Assert.Same(a, l.Attribute(Tier.Premium));
+            Assert.Equal(0, a.Tabs);
+            Assert.Same(a, l.Peek(Tier.Premium));                            // used up: still the newest of that quality
+            Assert.Null(l.Peek(Tier.Poor));
+        }
+
+        [Fact]
+        public void TierForADesignIsOneWhereItsBatchComesFirst()
+        {
+            var l = new BatchLedger();
+            l.Add("preset:plain", Tier.Premium, false, 2);
+            l.Add("preset:sunburst", Tier.Premium, false, 3);                 // behind plain at Premium
+            l.Add("preset:sunburst", Tier.Standard, false, 1);                // first at Standard
+            Assert.Equal(Tier.Premium, l.TierFor("preset:plain"));
+            Assert.Equal(Tier.Standard, l.TierFor("preset:sunburst"));
+            Assert.Equal(-1, l.TierFor("preset:third-eye"));
+            var only = new BatchLedger();
+            only.Add("preset:plain", Tier.Premium, false, 1);
+            only.Add("preset:sunburst", Tier.Premium, false, 1);
+            Assert.Equal(-1, only.TierFor("preset:sunburst"));                // plain's tab is taken first
+        }
+
+        [Fact]
         public void TheLedgerStaysBounded()
         {
             var l = new BatchLedger();

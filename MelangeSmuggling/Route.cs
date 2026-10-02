@@ -26,5 +26,12 @@ namespace Melange.Smuggling
 
         public static float SecondsSinceOnRoute => _lastOnRoute < 0f ? -1f : Time.realtimeSinceStartup - _lastOnRoute;
         public static bool DroveSince => _droveSince;
+
+        /// <summary>
+        /// TEST ONLY (the probe's <c>smuggling route walked</c>): as if the player had just come off the route on foot, so the
+        /// next delivery within the window counts as via the route without walking the tunnels. Tick keeps it until the player
+        /// gets into a vehicle, as it would after a real walk.
+        /// </summary>
+        public static void PretendWalked() { _lastOnRoute = Time.realtimeSinceStartup; _droveSince = false; }
     }
 }

@@ -35,7 +35,16 @@ Each: setup, then what to look for. "Host" means single player or the co-op host
 logs `PROBE <what>: <result>`: `status` (clock, pond window and toads, the warden, Randy, terrariums, frames, designs,
 batches, Ana, the recipe, pockets), `pond` (settime into today's pond window), `catch [spot] [force]` (`force` hands over a
 net first), `randy <terrarium|crickets|net|toad>`, `terra <place|add|milk|night [day]>`, `frame <place|add>`, `ana
-unlock`, `dose [design]` (lists each bad-batch roll), `trip <good|bad> [design]` (no customer, so no relationship change).
+unlock`, `dose [design]` (lists each bad-batch roll), `trip <good|bad> [design]` (no customer, so no relationship change),
+`terra days <n> [feed]` / `terra cycle <n> [feed]` (n midnight steps in a row on the nearest terrarium, `cycle` milking first
+each day; `feed` tops the tray up to a day's crickets; the days run ahead of the game's clock; reports births, dust,
+hunger and starvation per day), `sell <toad|lsd> [design] [contract]` (one item, from the pockets if there, to the nearest
+conscious customer through `NPC.Behaviour.ConsumeProduct_Server`, the call a handover ends with, so `OnNpcTrip` runs with
+a real customer; `contract` uses `Customer.ProcessHandover` on the customer's current contract instead, as a non-player
+handover that pays nobody; a design picks the quality the ledger would put down to that design), `ergot
+[plant|grow|harvest|status]` (ergot spawn into the nearest empty mushroom bed via `MushroomBed.CreateAndAssignColony_Server`,
+as the spawn task does, `ShroomColony.SetFullyGrown`, `GrowingMushroom.Harvest` per mushroom, and the colony's saved spawn
+ID; no step runs all four).
 `place` puts the item on the first free tiles of an owned property other than the RV, without taking it from the pockets.
 `probe-cmds.txt` is a ready-made run (one command per line, `wait N`, `#` comments).
 

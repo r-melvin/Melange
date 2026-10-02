@@ -90,16 +90,27 @@ namespace Melange.Hydro
 
         private static void AssignAll(ObjectSelector sel)
         {
+            int added = FillAll(sel, TrainingFor(sel.maxSelectedObjects));
+            if (added > 0 && sel.selectedObjects.Count >= sel.maxSelectedObjects) sel.CloseAndSubmit();   // as the game closes a full list after a click
+        }
+
+        /// <summary>
+        /// The Reload key's work on the selector's own list: every tray in its property, whole trays nearest the player first,
+        /// within its limit, holes the botanist isn't trained for (<paramref name="level"/>, null = unknown) left out. Returns
+        /// how many were added; -1 when the property has no holes. The probe runs it on the closed selector set up as the
+        /// botanist's list would open it.
+        /// </summary>
+        internal static int FillAll(ObjectSelector sel, TrainingLevel? level)
+        {
             var target = sel.targetProperty;
             var holes = new List<Hole>();
             foreach (var h in Holes.All)
                 if (h.Alive && (target == null || (h.Pot.ParentProperty != null && h.Pot.ParentProperty.Pointer == target.Pointer))) holes.Add(h);
-            if (holes.Count == 0) return;
+            if (holes.Count == 0) return -1;
 
             var list = sel.selectedObjects;
             int max = sel.maxSelectedObjects;
             var chosen = SelectedPointers(list);
-            var level = TrainingFor(max);
             var eye = PlayerPosition();
             var trays = new List<(float Distance, IReadOnlyList<int> Free)>();
             foreach (var run in Bulk.Runs(Spots(holes)))
@@ -120,7 +131,7 @@ namespace Melange.Hydro
             var add = Bulk.FillAll(ordered, max - list.Count);
             foreach (int i in add) Toggle(sel, holes[i].Pot, true);
             Mod.Log.Msg($"clipboard: every tray: {add.Count} hole(s) added ({list.Count}/{max})");
-            if (add.Count > 0 && list.Count >= max) sel.CloseAndSubmit();   // as the game closes a full list after a click
+            return add.Count;
         }
 
         // ------------------------------------------------------------------ helpers
@@ -129,7 +140,7 @@ namespace Melange.Hydro
         {
             var list = sel.selectedObjects;
             if (on) list.Add(pot); else list.Remove(pot);
-            sel.SetSelectionOutline(pot, on);
+            if (sel.IsOpen) sel.SetSelectionOutline(pot, on);
         }
 
         /// <summary>Whether the selector would take the hole (type, property, not another botanist's) and the botanist is trained for it.</summary>
@@ -160,7 +171,7 @@ namespace Melange.Hydro
         }
 
         // The cartel spoke found ManagementInterface's singleton null while the clipboard was equipped; look it up instead.
-        private static ManagementInterface Ui()
+        internal static ManagementInterface Ui()
         {
             if (_ui != null && _ui.Pointer != IntPtr.Zero) return _ui;
             _ui = null;

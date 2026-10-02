@@ -57,7 +57,7 @@ namespace Melange.Hydro
             catch (Exception e) { Mod.Log.Warning("botanist training: " + e.Message); _nextTick = Time.unscaledTime + 30f; }
         }
 
-        private static IEnumerable<Botanist> Botanists()
+        internal static IEnumerable<Botanist> Botanists()
         {
             var props = PropertyType.OwnedProperties;
             for (int p = 0; props != null && p < props.Count; p++)
@@ -112,23 +112,23 @@ namespace Melange.Hydro
             }
         }
 
-        private static void Train(Offer offer, TrainingLevel course)
+        private static string Train(Offer offer, TrainingLevel course)
         {
             var data = MelangeHydroData.Current;
             var b = offer.Botanist;
-            if (data == null || !Host.IsHost || b == null) return;
+            if (data == null || !Host.IsHost || b == null) return "no save data, not the host, or no botanist";
             Rank(out int rank, out int tier);
             if (!Training.CanOffer(Level(b), course, Unlocks.Reached(Unlocks.Hydro, rank, tier), Unlocks.Reached(Unlocks.Aero, rank, tier), out var why))
             {
                 Say(b, $"Not now: {why}.");
-                return;
+                return $"refused: {why}";
             }
             float price = Training.Price(course, HirePrice(b));
             var money = NetworkSingleton<MoneyManager>.Instance;
             if (money == null || money.cashBalance < price)
             {
                 Say(b, $"That course costs {MoneyManager.FormatAmount(price)}, cash up front.");
-                return;
+                return $"refused: costs ${price:N0}, cash ${(money == null ? 0f : money.cashBalance):N0}";
             }
             money.ChangeCashBalance(-price, true, true);
             data.Trained[Guid(b)] = (int)course;
@@ -137,6 +137,18 @@ namespace Melange.Hydro
             Say(b, course == TrainingLevel.Aeroponics
                 ? $"Towers, misters, the lot. I can run {b.MaxAssignedPots} sites now."
                 : $"Trays and reservoirs, got it. I can run {b.MaxAssignedPots} sites now.");
+            return $"trained in {Training.Describe(course)} for ${price:N0}; pot limit {b.MaxAssignedPots}, clipboard limit {b.configuration?.Assigns?.MaxItems}";
+        }
+
+        /// <summary>The probe's training: the same choice handler the dialogue runs (price, cash, limits), for one botanist.</summary>
+        internal static string ProbeTrain(Botanist b, TrainingLevel course)
+        {
+            if (!_offers.TryGetValue(b.Pointer, out var offer)) offer = Install(b);
+            if (offer == null) return $"{b.FullName} has no dialogue controller";
+            Refresh(offer);
+            var choice = course == TrainingLevel.Aeroponics ? offer.Aero : offer.Hydro;
+            string shown = choice.Enabled ? $"choice shown: '{choice.ChoiceText}'" : "choice not shown in his dialogue now";
+            return $"{shown}; {Train(offer, course)}";
         }
 
         /// <summary>The pot limit for his training, on the botanist and on his clipboard field (built from it).</summary>
@@ -175,7 +187,7 @@ namespace Melange.Hydro
         private static string Guid(Botanist b) => b.GUID.ToString();
 
         /// <summary>What Manny would charge for a botanist now: the botanist's signing fee plus the game's extra fee for staff already hired.</summary>
-        private static float HirePrice(Botanist b)
+        internal static float HirePrice(Botanist b)
         {
             float extra;
             try { extra = Il2CppScheduleOne.NPCs.CharacterClasses.Fixer.GetAdditionalSigningFee(); }

@@ -1,0 +1,64 @@
+# Melange Smuggling probe script (TESTING.md, "Probes").
+# One console command per line, submitted to the game console in order; "wait N" pauses N seconds; "#" starts a comment.
+# Host or single player, on a save with OG Kush discovered (the orders are drawn from discovered products) and at least
+# 5 free pocket slots. Every "smuggling" line logs "PROBE <what>: <result>" to the Melange_Smuggling logger in
+# MelonLoader/Latest.log; every delivery also logs "delivery police roll: roll <r> vs risk <p> ..., SEIZED|passed".
+# "route unknown", "route walked" and "risk" are TEST ONLY: they exist for this script and change nothing in normal play.
+
+smuggling status
+changecash 5000
+wait 1
+
+# Unlock: Oscar's line, Dafydd's number and first text
+smuggling unlock
+wait 3
+
+# Run 1: an order, accepted, 20 OG Kush loaded from the pockets, sailed (pays), back in
+smuggling order
+wait 1
+smuggling accept
+give ogkush 20
+wait 1
+smuggling load
+smuggling sail
+wait 2
+smuggling return
+wait 2
+smuggling status
+
+# Imports open once a run has been paid and the boat is in. List them, then buy a crate of acid the way Dafydd's
+# "Bring something back" choice does (cash up front); it rides back on the next return.
+smuggling imports
+smuggling import acid 1
+smuggling imports
+
+# Run 2, which brings the crate back. Accept it, then the seizure check.
+smuggling order
+wait 1
+smuggling accept
+
+# Seizure check A: route unknown, street risk forced to 1 for this one delivery -> SEIZED, the 20 units lost
+smuggling route unknown
+give ogkush 20
+wait 1
+smuggling risk 1
+smuggling load
+smuggling route
+
+# Seizure check B: route known and just walked off it on foot, the same forced risk -> x0 via the route, passes
+smuggling route known
+smuggling route walked
+give ogkush 20
+wait 1
+smuggling risk 1
+smuggling load
+smuggling route
+smuggling risk
+
+# Sail, return (the acid crate lands), collect: items given, what's left waiting, free pocket slots before and after
+smuggling sail
+wait 2
+smuggling return
+wait 2
+smuggling collect
+smuggling status

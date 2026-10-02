@@ -10,6 +10,20 @@ Install: `MelangeCore.dll`, `MelangeMixers.dll`, S1API (the IL2CPP build the rep
 
 ## Probes
 
+**Scripted probes.** The console command `mixers` (host only; `Probe.cs`) acts on the Melange mixer nearest the player and
+logs `PROBE <what>: <result>`: `status` (every machine: tier, extra slots, each slot's stack and lock, the operation, chain
+state, minutes left, batch cap and speed), `place <2|3|4>` (first free tiles of an owned property other than the RV, through
+`BuildManager.CreateGridItem`), `load <product> <qty> <mixer1>[:qty] ...` (new item instances straight into the slots;
+`cuke:7` sets one slot's stack; the output slot is cleared), `start` (the station screen's own `MixingStationInterface.BeginMix`
+with the screen's Station pointed at the machine, so the spoke's start prefix runs), `finish` (`MixingStation.OnTimePass`
+with the minutes left: the game's MixingDone -> TryCreateOutputItems, where the spoke's finish prefix runs), `name <name>`
+(the spoke's naming of a new result), `output` (what came out, against the same mixers applied one after another with the
+game's `EffectMixCalculator.MixProperties` / `GetKnownProduct`, and its recorded recipes: MATCH / MISMATCH), and
+`employee [hire|assign]` (the chemist clipboard's `ObjectSelector.IsObjectTypeValid` with the chemist's station field,
+`ChemistConfiguration.IsStationValid`, and once assigned `Chemist.GetMixingStationsReadyToStart`; `hire` is Manny's
+`DialogueController_Fixer.Confirm`, cash taken; `assign` is the clipboard submit's `ObjectListField.SetList`).
+`probe-cmds.txt` is a ready-made run (one command per line, `wait N`, `#` comments).
+
 ### P1. Registration and shop
 - Set up: load any save.
 - Log, at load: `Two-Ingredient Mixer: registered at $X (Mk2 $Y), unlocks at rank 8 tier 1` (and Three/Four with ranks 9
@@ -158,4 +172,10 @@ Install: `MelangeCore.dll`, `MelangeMixers.dll`, S1API (the IL2CPP build the rep
   min/item, batch 20`, is written to `Properties/Motel Room.json`, and after a reload comes back with the same GUID and
   `extra slots restored; chain (idle)`. (Placed in the RV of the test save, where the RV is still wrecked, nothing was
   saved at all, the Mk2 included: the RV, not the mixer.)
-- P2 and P4-P11 need a mix to run (the station UI, or an employee): left for a hands-on play test.
+- **A three-ingredient mix passed in game** (2026-10-02, slot 1, the `mixers` probe command, which starts the mix the way
+  the station's Begin does and fast-forwards with the game's `OnTimePass`): 10 OG Kush + Cuke + Banana (7) + Paracetamol
+  took 40 min (4 min/item against the Mk2's 3, x1.25 rounded), held the second and third ingredients locked during the
+  mix, asked for a name for the new result, and gave 10x "Probe Kush" [Calming, Energizing, Sneaky, Thought-Provoking]:
+  the same product as three Mk2 passes one after another (MATCH, quantity as started). A second run with 5 gave 5.
+  A chemist's clipboard accepts the mixer as a station (`ChemistConfiguration.IsStationValid` True); the test save's
+  chemist had his list full (4/4), so an employee running it is not run yet.

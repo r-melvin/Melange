@@ -49,6 +49,24 @@ namespace Melange.Hydro
             catch (Exception e) { Mod.Log.Warning("pumps: " + e.Message); _nextTick = Time.unscaledTime + 30f; }
         }
 
+        /// <summary>For the probe: each pump, its tap and the holes in its range.</summary>
+        internal static string Describe()
+        {
+            var parts = new List<string>();
+            foreach (var p in _pumps.Values)
+            {
+                if (p.Item == null || p.Item.Pointer == IntPtr.Zero) continue;
+                var at = p.Item.transform.position;
+                int served = 0;
+                foreach (var h in Holes.All)
+                    if (h.Alive && h.Pot.ParentProperty != null && p.Item.ParentProperty != null && h.Pot.ParentProperty.Pointer == p.Item.ParentProperty.Pointer
+                        && Vector3.Distance(h.Pot.transform.position, at) <= ServeRange) served++;
+                string tap = p.Tap == null || p.Tap.Pointer == IntPtr.Zero ? "no tap" : $"tap {Vector3.Distance(p.Tap.transform.position, at):0.0} m away";
+                parts.Add($"pump {p.Guid} at {p.Item.ParentProperty?.PropertyCode}: {tap}, {served} hole(s) in range");
+            }
+            return parts.Count == 0 ? "no pumps" : string.Join("; ", parts);
+        }
+
         /// <summary>Finds placed pumps (on every player's game, for the look), hoses each to its tap.</summary>
         private static void Scan()
         {

@@ -117,6 +117,23 @@ namespace Melange.Hydro
             catch (Exception e) { Mod.Log.Warning("curing: " + e.Message); }
         }
 
+        /// <summary>
+        /// The probe's curing fast-forward: the curve is computed from when the plant was first seen grown, so moving that
+        /// time back by <paramref name="minutes"/> (here and in the host's save) is the same as that time passing; then one
+        /// Plant.MinPass runs the curing step as the clock would. Returns null when the plant isn't curing.
+        /// </summary>
+        internal static string AgeCure(Plant plant, Hole hole, int minutes)
+        {
+            if (plant == null) return null;
+            if (!_cures.ContainsKey(plant.Pointer)) plant.MinPass(1);       // grown since the last minute: let the curing step see it
+            if (!_cures.TryGetValue(plant.Pointer, out var cure)) return null;
+            cure.GrownAt -= minutes;
+            var data = MelangeHydroData.Current;
+            if (Host.IsHost && data != null && hole?.Guid != null) data.GrownAt[hole.Guid] = cure.GrownAt;
+            plant.MinPass(1);
+            return Describe(plant);
+        }
+
         /// <summary>For the log: a cured plant's state (null if not curing).</summary>
         public static string Describe(Plant plant)
         {
