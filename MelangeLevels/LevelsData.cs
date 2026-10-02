@@ -30,6 +30,24 @@ namespace Melange.Levels
 
         public MelangeLevelsData() { Current = this; }
 
+        /// <summary>
+        /// Back to a fresh game's values. S1API keeps one instance for the whole session and, loading a save, only sets the
+        /// fields that save has files for: without this, a save with no Levels data loaded after one with it would inherit
+        /// that save's rewards. Called on returning to the menu, before the next save loads.
+        /// </summary>
+        public void ResetToDefaults()
+        {
+            Version = CurrentVersion;
+            RewardedUpTo = 0;
+            EmployeeSlotsEarned = 0;
+            EmployeeSlotsPlaced = new Dictionary<string, int>();
+            UnderbossCandidates = 0;
+            DiscountStep = 0;
+            Prestige = 0;
+            OffersLastUsed = new Dictionary<string, int>();
+            WarehouseDiscountDay = -1;
+        }
+
         public int SlotsLeft
         {
             get

@@ -21,6 +21,7 @@ namespace Melange.Levels
             Events.Subscribe<TierReached>(e => { if (Host.IsHost) Grant((int)e.Reached.Rank, e.Reached.Tier); });
             Events.Subscribe<SaveLoaded>(_ => AfterLoad());
             Events.Subscribe<MainSceneLoaded>(_ => OfferActions.ForgetScene());
+            Events.Subscribe<MenuLoaded>(_ => MelangeLevelsData.Current?.ResetToDefaults());
             OfferActions.Start();
             // bulk orders: the discount step held in this save, on every channel (none before Block Boss I)
             OrderTotals.Register(new OrderModifier

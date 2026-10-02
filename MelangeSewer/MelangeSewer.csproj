@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Melange Sewer: the sewer story rework ("Down the Drain") (a Melange spoke; needs Melange Core).
+       Shared settings: ../Directory.Build.props -->
+  <PropertyGroup>
+    <AssemblyName>MelangeSewer</AssemblyName>
+    <RootNamespace>Melange.Sewer</RootNamespace>
+    <!-- S1API is compiled against a pinned copy: -p:S1ApiDll=..., then ../lib (gitignored), then the game's Mods. -->
+    <S1ApiDll Condition="'$(S1ApiDll)' == '' And Exists('$(MSBuildThisFileDirectory)../lib/S1API.Il2Cpp.MelonLoader.dll')">$(MSBuildThisFileDirectory)../lib/S1API.Il2Cpp.MelonLoader.dll</S1ApiDll>
+    <S1ApiDll Condition="'$(S1ApiDll)' == ''">$(GameDir)/Mods/S1API.Il2Cpp.MelonLoader.dll</S1ApiDll>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="S1API.Il2Cpp.MelonLoader"><HintPath>$(S1ApiDll)</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(Interop)/UnityEngine.PhysicsModule.dll</HintPath><Private>false</Private></Reference>
+    <ProjectReference Include="../MelangeCore/MelangeCore.csproj" Private="false" />
+  </ItemGroup>
+</Project>
