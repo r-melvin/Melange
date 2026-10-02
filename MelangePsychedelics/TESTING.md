@@ -23,6 +23,14 @@ to grep for. Console commands are the game's own (`give`, `settime`, `addxp`, `c
 
 Each: setup, then what to look for. "Host" means single player or the co-op host.
 
+**Scripted probes.** The console command `psy` (host only; `Probe.cs`) drives P2-P9 through the same code as the prompts and
+logs `PROBE <what>: <result>`: `status` (clock, pond window and toads, the warden, Randy, terrariums, frames, designs,
+batches, Ana, the recipe, pockets), `pond` (settime into today's pond window), `catch [spot] [force]` (`force` hands over a
+net first), `randy <terrarium|crickets|net|toad>`, `terra <place|add|milk|night [day]>`, `frame <place|add>`, `ana
+unlock`, `dose [design]` (lists each bad-batch roll), `trip <good|bad> [design]` (no customer, so no relationship change).
+`place` puts the item on the first free tiles of an owned property other than the RV, without taking it from the pockets.
+`probe-cmds.txt` is a ready-made run (one command per line, `wait N`, `#` comments).
+
 ### P1. Load and registration
 - Setup: load any save.
 - Log, in this order or close to it: `vanilla shroom line: spores '<id>', spawn '<id>', shroom '<id>'` (record the IDs),

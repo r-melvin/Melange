@@ -1,0 +1,56 @@
+# Melange Levels: the police offer (README, Testing 1, 3, 4, 5). Host or single player, a loaded save.
+# One console command per line; "wait N" pauses N seconds; results are "PROBE ..." lines in the Melange_Levels log.
+# The hard curfew only applies once the game has enabled curfew (curfew reports "enabled True"); on a save where it
+# isn't, the curfew lines show False throughout and only the pursuit and timing checks mean anything.
+# Note: settime keeps the day, so "settime 0600" straight after buying at 21:30 is still the same night (the offer runs to
+# the NEXT 06:00). The script crosses midnight first (settime 2358, then a game minute or two passes the day).
+
+levels status
+levels cooldown police
+levels prestige 2
+
+# in the hard curfew (21:15 on); a few game minutes so the game's minute tick sets it and the player gets the state
+settime 2130
+wait 5
+levels curfew
+# expect: hard True, DisobeyingCurfew state present True, police offer active False
+
+# a search for the player, then buy the offer: it is called off
+levels pursuit investigating
+wait 1
+levels status
+# expect: pursuit Investigating
+levels offer police
+# expect: bought; Prestige n -> n-1; police offer active True; pursuit None (log "offer: the search for you is called off")
+wait 3
+levels status
+# expect: lenient until day <today+1> 06:00, active True; since last body search ~0.0s; DisobeyingCurfew present False
+levels curfew
+# expect: hard True, state present False (removed every frame while active)
+levels offer police
+# expect: already looking away
+
+# the end: cross midnight, then 06:00
+settime 2358
+wait 5
+levels status
+# expect: day +1, still active (before 06:00)
+settime 0559
+wait 5
+levels status
+# expect: police offer active False; PoliceLookAway "again in 2 days" (cooldown 3 days from the day bought)
+levels offer police
+# expect: refused (cooldown)
+
+# a chase isn't called off: Arresting stays on (cooldown bypassed for the test)
+levels cooldown police
+settime 2130
+wait 5
+levels pursuit arresting
+wait 1
+levels offer police
+# expect: bought; pursuit Arresting (not called off); police offer active True
+wait 2
+levels status
+levels pursuit none
+levels status

@@ -53,3 +53,11 @@ pursuits are called off) are covered by `Melange.Tests/OffersTests.cs`. How it w
    again. The offer can be bought again 3 in-game days after the day it was bought.
 6. Save while it's on, quit to the menu, load: it's still on until 6 AM. Load a different save: it's off.
 7. Vehicle checkpoints still search your car: the offer doesn't cover them (see `POLICE-SPIKE.md`).
+
+Results (2026-10-02, slot 1, IL2CPP, scripted with the `levels` probe command): bought at 21:37 in the hard curfew, the
+player's `DisobeyingCurfew` state is removed and stays gone, the time since the last body search is held at 0, a second
+purchase is refused while it is on, and it is still on at 05:59 the next morning and off at 06:17 (cooldown shown).
+Bought in the same frame as an Investigating pursuit, the search is called off (pursuit None) and stays off. An
+Arresting chase is left on. (On the test save the player holds a shotgun, and an officer seeing it raises a pursuit to
+NonLethal within a second or two: the game's `NoticePlayerBrandishingWeapon`, not the offer.) Not run yet: an actual
+patrol walking past without searching, the Connections app's buttons, and save/reload while it is on.

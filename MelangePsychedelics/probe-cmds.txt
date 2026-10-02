@@ -1,0 +1,77 @@
+# Melange Psychedelics probe script (TESTING.md P2-P9, see "Scripted probes" there).
+# One console command per line, submitted to the game console in order; "wait N" pauses N seconds; "#" starts a comment.
+# Host or single player, on a save with an owned property other than the RV (for the terrarium and the frame).
+# Every "psy" line logs "PROBE <what>: <result>" to the Melange_Psychedelics logger in MelonLoader/Latest.log.
+
+psy status
+changecash 20000
+wait 1
+
+# P2: the products in hand (check looks and icons by eye)
+give melange.psy:products/toad 5
+give melange.psy:products/lsd 3
+
+# P3: Randy's stall by day (terrarium, crickets, net; no toads)
+settime 1200
+wait 2
+psy randy net
+psy randy terrarium
+psy randy crickets
+psy randy crickets
+psy randy toad
+
+# P4: the pond. "psy pond" is settime a few minutes into today's window (it opens 19:00-22:00, a different time each day).
+psy pond
+wait 3
+psy status
+psy catch
+wait 2
+psy catch
+wait 2
+# a third catch; "force" would hand over a net if the first ones had lost it
+psy catch force
+wait 1
+psy status
+
+# P3: Randy at night (22:00-24:00 by default): a dearer toad each time, then sold out (stock is 2-4)
+settime 2215
+wait 2
+psy randy toad
+psy randy toad
+psy randy toad
+psy randy toad
+psy randy toad
+psy randy crickets
+
+# P5: a terrarium at a property, toads and crickets in, milk (twice: the second is refused), the midnight step
+psy terra place
+wait 3
+psy terra add
+wait 2
+psy terra milk
+wait 1
+psy terra milk
+psy terra night
+wait 1
+psy status
+
+# P8: Ana Slughin (as a customer's recommendation would) and the LSD recipe
+psy ana unlock
+wait 2
+psy ana
+
+# P9: a blotter frame, sheets and solution in, dose with a design, then customer trips on that design
+give melange_psy_blank_sheet 3
+give melange_psy_lsd_solution 2
+psy frame place
+wait 3
+psy frame add
+wait 2
+psy dose sunburst
+wait 1
+psy trip good sunburst
+psy trip good sunburst
+psy trip bad sunburst
+psy trip good
+wait 1
+psy status

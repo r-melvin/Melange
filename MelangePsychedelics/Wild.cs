@@ -241,5 +241,63 @@ namespace Melange.Psychedelics
             var me = Il2CppScheduleOne.PlayerScripts.Player.Local;
             return me != null && (me.transform.position - p).sqrMagnitude <= metres * metres;
         }
+
+        // ------------------------------------------------------------------ probes (Probe.cs)
+
+        internal static string ProbeStatus()
+        {
+            if (!Settings.WildToads) return "pond off (WildToads)";
+            if (_spots.Count == 0) return _pondSearched ? "pond not found" : "pond not searched yet";
+            var data = Data;
+            int day = Placed.Day, minute = Clock.ToMinutes(S1API.GameTime.TimeManager.CurrentTime);
+            var today = PondSchedule.For(Seed, day, _spots.Count);
+            var open = PondSchedule.OpenNow(Seed, day, minute, _spots.Count, out int into);
+            var outSpots = new List<int>(_pondToads.Keys);
+            outSpots.Sort();
+            return $"pond today {Clock.ToHhmm(today.Window.OpenAt):D4} for {today.Window.Minutes} min, spots [{string.Join(",", today.Spots)}]; " +
+                   (open == null ? "closed" : $"OPEN (night of day {open.Day}, {into} min in)") +
+                   $"; out [{string.Join(",", outSpots)}], caught [{string.Join(",", data.PondCaught)}] (day {data.PondDay}), offences {data.PondOffences}; " +
+                   WildlifeWarden.Describe(_pond, _pondRadius, _spots.Count, open != null ? WildlifeOfficer.At(into, _spots.Count) : -1);
+        }
+
+        /// <summary>Sets the clock (the game's settime) a few minutes into today's pond window.</summary>
+        internal static string ProbePondTime()
+        {
+            if (_spots.Count == 0) return "pond not found";
+            var today = PondSchedule.For(Seed, Placed.Day, _spots.Count);
+            int at = Clock.ToHhmm(today.Window.OpenAt + 5);
+            S1API.GameTime.TimeManager.SetTime(at);
+            return $"time set to {at:D4} (window {Clock.ToHhmm(today.Window.OpenAt):D4} for {today.Window.Minutes} min, spots [{string.Join(",", today.Spots)}]); toads appear within a second";
+        }
+
+        /// <summary>Catches at a spot (default: the first toad out) through the prompt's own handler.</summary>
+        internal static string ProbeCatch(string spotArg, bool force)
+        {
+            var data = Data;
+            if (_spots.Count == 0) return "pond not found";
+            string net = "";
+            if (force && !Items.Has(Ids.ToadNet)) net = Items.Give(Items.Make(Ids.ToadNet, 1)) ? "gave a toad net; " : "no room for a toad net; ";
+            var outSpots = new List<int>(_pondToads.Keys);
+            outSpots.Sort();
+            int spot;
+            if (spotArg == null)
+            {
+                if (outSpots.Count == 0) return net + "no toads out now (psy pond sets the time into the window)";
+                spot = outSpots[0];
+            }
+            else if (!int.TryParse(spotArg, out spot) || spot < 0 || spot >= _spots.Count) return $"spot must be 0..{_spots.Count - 1}";
+            if (!_pondToads.ContainsKey(spot)) return net + $"no toad at spot {spot} (out: [{string.Join(",", outSpots)}])";
+            bool hasNet = Items.Has(Ids.ToadNet);
+            float cash = S1API.Money.Money.GetCashBalance();
+            int toads = Items.Count(Ids.LiveToad), offences = data.PondOffences;
+            CatchAtPond(spot);
+            float paid = cash - S1API.Money.Money.GetCashBalance();
+            string outcome = !hasNet ? "no net: refused"
+                : data.PondOffences > offences ? $"SEEN, offence {data.PondOffences}, fined {paid:N0}, toad confiscated"
+                : Items.Count(Ids.LiveToad) > toads ? "caught unseen"
+                : "not caught (pockets full?)";
+            return $"{net}spot {spot}: {outcome}; toads in pockets {toads} -> {Items.Count(Ids.LiveToad)}, cash {cash:N0} -> {S1API.Money.Money.GetCashBalance():N0}; " +
+                   WildlifeWarden.Describe(_pond, _pondRadius, _spots.Count, -1);
+        }
     }
 }

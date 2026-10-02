@@ -138,10 +138,36 @@ namespace Melange.Psychedelics
             return true;
         }
 
-        public static bool Has(string id)
+        public static bool Has(string id) => Count(id) > 0;
+
+        /// <summary>How many of an item the local player carries.</summary>
+        public static int Count(string id)
         {
             var inv = Il2CppScheduleOne.DevUtilities.PlayerSingleton<Il2CppScheduleOne.PlayerScripts.PlayerInventory>.Instance;
-            return inv != null && inv.GetAmountOfItem(id) > 0;
+            return inv == null ? 0 : (int)inv.GetAmountOfItem(id);
+        }
+
+        /// <summary>
+        /// Moves up to n of an item from the local player's pockets into a storage, slot by slot (each keeps its quality), as
+        /// dragging them across would. Returns how many moved. For the probes (Probe.cs).
+        /// </summary>
+        public static int MoveToStorage(Il2CppScheduleOne.Storage.StorageEntity s, string id, int n = int.MaxValue)
+        {
+            var inv = Il2CppScheduleOne.DevUtilities.PlayerSingleton<Il2CppScheduleOne.PlayerScripts.PlayerInventory>.Instance;
+            var slots = inv?.hotbarSlots;
+            int moved = 0;
+            for (int i = 0; s != null && slots != null && i < slots.Count && moved < n; i++)
+            {
+                var slot = slots[i];
+                if (slot?.ItemInstance == null || slot.ItemInstance.ID != id || slot.Quantity <= 0) continue;
+                int k = Math.Min(slot.Quantity, n - moved);
+                while (k > 0 && !s.CanItemFit(slot.ItemInstance, k)) k--;
+                if (k <= 0) break;
+                s.InsertItem(slot.ItemInstance.GetCopy(k), true);
+                slot.ChangeQuantity(-k);
+                moved += k;
+            }
+            return moved;
         }
 
         public static void Notify(string title, string text)

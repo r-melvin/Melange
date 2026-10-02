@@ -131,5 +131,43 @@ namespace Melange.Psychedelics
             };
             Items.Notify("Randy", "One tub of crickets per toad a day. Two fed toads together breed. " + where);
         }
+
+        // ------------------------------------------------------------------ probes (Probe.cs)
+
+        /// <summary>Runs the scan now, so a probe right after a settime sees the stall as it is.</summary>
+        private static void Refresh() { _next = 0f; Tick(); }
+
+        internal static string ProbeStatus()
+        {
+            if (!Settings.Stall) return "Randy's stall off";
+            Refresh();
+            if (_root == null) return "Randy's stall not built";
+            int stock = _night >= 0 ? RandysStall.Stock(Wild.Seed, _night) : 0;
+            var toad = _mode == Mode.Night ? Offer(Slot.Middle) : null;
+            return $"Randy {_mode}" + (_mode == Mode.Night ? $" (night of day {_night}), toad {(toad == null ? "sold out" : $"${toad.Value.price:N0}")}, {Math.Max(0, stock - _sold)}/{stock} left tonight" : "");
+        }
+
+        /// <summary>Buys from the stall through the prompt's own handler: terrarium, crickets, net (by day) or toad (at night).</summary>
+        internal static string ProbeBuy(string item)
+        {
+            if (!Settings.Stall) return "Randy's stall off";
+            Refresh();
+            if (_root == null) return "Randy's stall not built";
+            Slot slot; string id;
+            switch (item)
+            {
+                case "terrarium": slot = Slot.Left; id = Ids.Terrarium; break;
+                case "crickets": slot = Slot.Middle; id = Ids.Crickets; break;
+                case "net": slot = Slot.Right; id = Ids.ToadNet; break;
+                case "toad": slot = Slot.Middle; id = Ids.LiveToad; break;
+                default: return "randy <terrarium|crickets|net|toad>";
+            }
+            var o = Offer(slot);
+            if (o == null || o.Value.id != id) return $"{item} not on sale now (stall {_mode}{(o == null && _mode == Mode.Night && id == Ids.LiveToad ? ", sold out" : "")})";
+            float cash = S1API.Money.Money.GetCashBalance();
+            int had = Items.Count(id);
+            Buy(slot);
+            return $"{o.Value.what} at ${o.Value.price:N0}: cash {cash:N0} -> {S1API.Money.Money.GetCashBalance():N0}, {id} in pockets {had} -> {Items.Count(id)}; {ProbeStatus()}";
+        }
     }
 }

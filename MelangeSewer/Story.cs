@@ -20,7 +20,7 @@ namespace Melange.Sewer
     /// fate) and carries out the effects it returns. The host decides everything; a co-op client keeps the vanilla sewer
     /// apart from Oscar's rewritten lines (see TESTING.md).
     /// </summary>
-    internal static class Story
+    internal static partial class Story
     {
         /// <summary>The live quest logic on the host once a save has loaded; null otherwise (the King patch then stays out of the way).</summary>
         public static SewerQuest Quest { get; private set; }
@@ -41,6 +41,7 @@ namespace Melange.Sewer
         public static void Start()
         {
             OscarHints();
+            ProbeStart();
             Events.Subscribe<SaveLoaded>(_ => OnSaveLoaded());
             Events.Subscribe<MenuLoaded>(_ => OnMenu());
             Events.Subscribe<TierReached>(e =>
@@ -374,6 +375,7 @@ namespace Melange.Sewer
             foreach (var fx in effects)
             {
                 Mod.Log.Msg($"[{why}] {fx}");
+                Heard($"[{why}] {fx}");
                 try { Do(fx); }
                 catch (Exception e) { Mod.Log.Error($"sewer effect {fx}: {e}"); }
             }

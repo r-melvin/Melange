@@ -1,6 +1,6 @@
 # Melange Sewer: in-game checks
 
-Nothing here has run in the game yet. The pure logic (`Logic/`) is covered by `Melange.Tests/SewerTests.cs`; everything
+P1-P10 have run in the game (Results so far, at the end). The pure logic (`Logic/`) is covered by `Melange.Tests/SewerTests.cs`; everything
 that touches the game is listed below as a probe scenario, then every assumption code could not settle.
 
 Install: `MelangeCore.dll`, `MelangeSewer.dll`, S1API. Log lines come from the `Melange_Sewer` logger in
@@ -162,4 +162,16 @@ Each: setup, then what to look for. "Host" means single player or the co-op host
   key sale closed; her vanilla offer line is "I wanna help you, but I'll be out of a job if the mayor finds out. I'll need
   <PRICE> for it to be worth the risk."; slot 1's King was already dead (the game's flag), so the fate is KingDefeated;
   reaching Bagman V offered the quest exactly once (step TalkToJerry); Oscar's ENTRY and NPC_HINT lines are rewritten.
-- P4 onwards need dialogue with Jerry and walking the sewer: not yet scripted.
+- **P4-P10 passed in game** (2026-10-02, scripted with the `sewer` probe command and `probe-cmds.txt`, on a copy of slot 1
+  with the game's `HasSewerKingBeenDefeated` set false in `Sewer.json`, restored afterwards): Jerry's warning (step
+  EnterSewer: this save already had the sewer key, so "key early"), Frank's rumour, Jen's key sold through her own
+  callback once the relationship allowed it, the scripted goblin visit after 30 s in the sewer (step FindClues), the
+  journal and the plaque clues (KingIdentified, step ConfrontKing), meeting the King ("Who sent you? This is my kingdom."),
+  sparing him (his mentor lines, the route revealed), the underboss deal (UnderbossHired, QuestComplete, the manager
+  registered, his chat line), then killing him anyway (fate Defeated, the game's flag set, the stash offered at
+  (53, -9, 72) and taken by walking to it).
+- Not covered by the run: the goblin calmed by meth. The game only pacifies him when the targeted player is holding the
+  pacify item (`SewerGoblin.IsPlayerHoldingPacifyItem`, meth) in hand; the script gave meth but did not equip it, so he
+  attacked. Hold meth when he comes. Also the payout and reveal branches (one deal per save: reload a save made at the
+  fork) and the King attacked branch (needs a hit by hand). The King's health read 0/100 throughout, an artifact of
+  editing the flag on a save where he had been killed.

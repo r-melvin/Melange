@@ -155,35 +155,89 @@ namespace Melange.Psychedelics
             Mod.Log.Msg($"frame {guid}: design {next.Id} ({next.Name}, reputation {next.Reputation:F0})");
         }
 
-        /// <summary>Doses as many sheets as there are vials for: each sheet its own batch and bad-batch roll.</summary>
-        private static void Dose(BuildableItem b, string guid)
+        /// <summary>
+        /// Doses as many sheets as there are vials for: each sheet its own batch and bad-batch roll. Returns what happened, with
+        /// each roll (for the probe; the player is never told).
+        /// </summary>
+        private static string Dose(BuildableItem b, string guid)
         {
             try
             {
-                if (!Host.IsHost) { Items.Notify("Blotter frame", "Only the host can dose sheets in this version."); return; }
+                if (!Host.IsHost) { Items.Notify("Blotter frame", "Only the host can dose sheets in this version."); return "not the host"; }
                 var data = Data;
                 var s = Placed.Storage(b);
-                if (data == null || s == null) return;
+                if (data == null || s == null) return "no save data or no storage";
                 var design = DesignOf(guid);
-                if (design == null) { Items.Notify("Blotter frame", "No design to print: un-retire one."); return; }
+                if (design == null) { Items.Notify("Blotter frame", "No design to print: un-retire one."); return "no design"; }
                 int made = 0, bad = 0, lost = 0;
+                var rolls = new List<string>();
                 while (Placed.Count(s, Ids.BlankSheet) > 0 && TakeSolution(s, out int tier))
                 {
                     Placed.Take(s, Ids.BlankSheet, 1);
-                    bool isBad = BadBatch.IsBad(tier, UnityEngine.Random.value, Settings.BadBatchOdds);
-                    data.Batches.Add(design.Id, tier, isBad, Ids.TabsPerSheet);
+                    float roll = UnityEngine.Random.value;
+                    bool isBad = BadBatch.IsBad(tier, roll, Settings.BadBatchOdds);
+                    var batch = data.Batches.Add(design.Id, tier, isBad, Ids.TabsPerSheet);
+                    rolls.Add($"batch {batch.Id} {Tier.Name(tier)} roll {roll:0.000} vs {BadBatch.Chance(tier, Settings.BadBatchOdds):0.000} {(isBad ? "BAD" : "good")}");
                     design.SheetsPrinted++;
                     if (isBad) bad++;
                     if (!Placed.Put(s, Products.Make(Ids.LsdProduct, 1, tier, "brick"))) lost++;
                     made++;
                 }
-                if (made == 0) { Items.Notify("Blotter frame", "Load blank sheets and LSD solution into the frame first."); return; }
+                if (made == 0) { Items.Notify("Blotter frame", "Load blank sheets and LSD solution into the frame first."); return "nothing to dose (no blank sheets or no solution in the frame)"; }
                 Products.DiscoverOnce(Ids.LsdProduct);
                 Items.Notify("Dosed", $"{made} sheet(s) of {design.Name}." + (lost > 0 ? $" {lost} lost: no room." : ""));
                 // the player isn't told which went bad: a bad batch looks like any other
-                Mod.Log.Msg($"frame {guid}: dosed {made} sheet(s) of {design.Id}, {bad} bad, {lost} lost");
+                string line = $"frame {guid}: dosed {made} sheet(s) of {design.Id}, {bad} bad, {lost} lost";
+                Mod.Log.Msg(line);
+                return line + " [" + string.Join("; ", rolls) + "]";
             }
-            catch (Exception e) { Mod.Log.Warning("dosing: " + e.Message); }
+            catch (Exception e) { Mod.Log.Warning("dosing: " + e.Message); return "threw: " + e.Message; }
+        }
+
+        // ------------------------------------------------------------------ probes (Probe.cs, host only)
+
+        internal static string ProbeStatus()
+        {
+            var all = new List<string>();
+            foreach (var b in Placed.All(Ids.BlotterFrame))
+            {
+                var s = Placed.Storage(b);
+                string guid = Placed.Guid(b);
+                all.Add($"{guid.Substring(0, Math.Min(8, guid.Length))} {DesignOf(guid)?.Id ?? "no design"}, sheets {(s == null ? 0 : Placed.Count(s, Ids.BlankSheet))}, " +
+                        $"solution {(s == null ? 0 : Placed.Count(s, Ids.LsdSolution))}, LSD sheets {(s == null ? 0 : Placed.Count(s, Ids.LsdProduct))}");
+            }
+            return $"{all.Count} frame(s)" + (all.Count > 0 ? ": " + string.Join("; ", all) : "");
+        }
+
+        /// <summary>Blank sheets and solution from the pockets into the nearest frame.</summary>
+        internal static string ProbeAdd()
+        {
+            var b = Placed.Nearest(Ids.BlotterFrame);
+            var s = Placed.Storage(b);
+            if (s == null) return "no blotter frame placed (psy frame place)";
+            int sheets = Items.MoveToStorage(s, Ids.BlankSheet), solution = Items.MoveToStorage(s, Ids.LsdSolution);
+            return $"put in {sheets} blank sheet(s) and {solution} solution(s); {ProbeStatus()}";
+        }
+
+        /// <summary>The sheet prompt's dose on the nearest frame, after setting its design (if given) and loading it from the pockets if empty.</summary>
+        internal static string ProbeDose(Design design)
+        {
+            var b = Placed.Nearest(Ids.BlotterFrame);
+            var s = Placed.Storage(b);
+            if (s == null) return "no blotter frame placed (psy frame place)";
+            string guid = Placed.Guid(b);
+            if (design != null) Data.FrameDesigns[guid] = design.Id;
+            string loaded = "";
+            if (Placed.Count(s, Ids.BlankSheet) == 0 || Placed.Count(s, Ids.LsdSolution) == 0)
+                loaded = $"loaded {Items.MoveToStorage(s, Ids.BlankSheet)} sheet(s) and {Items.MoveToStorage(s, Ids.LsdSolution)} solution(s) from the pockets; ";
+            return loaded + Dose(b, guid);
+        }
+
+        /// <summary>The design the nearest frame prints, if there's a frame.</summary>
+        internal static Design NearestDesign()
+        {
+            var b = Placed.Nearest(Ids.BlotterFrame);
+            return b == null ? null : DesignOf(Placed.Guid(b));
         }
 
         /// <summary>Takes one vial of solution and reports its quality.</summary>

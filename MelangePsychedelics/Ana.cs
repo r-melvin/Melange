@@ -99,5 +99,25 @@ namespace Melange.Psychedelics
             }
             catch (Exception e) { Mod.Log.Warning("LSD solution recipe availability: " + e.Message); }
         }
+
+        // ------------------------------------------------------------------ probes (Probe.cs)
+
+        internal static string ProbeStatus()
+        {
+            var ana = NPC.Get<AnaSlughin>();
+            var r = Items.Recipe;
+            return $"Ana {(ana == null ? "not spawned" : ana.Relationship?.IsUnlocked == true ? "unlocked" : "locked")}, LSD recipe " +
+                   (r == null ? "not registered" : $"{(r.IsUnlocked ? "open" : "locked")} (discovered {r.IsDiscovered})");
+        }
+
+        /// <summary>Unlocks her the way a customer's recommendation does; her unlock handler opens the recipe and texts.</summary>
+        internal static string ProbeUnlock()
+        {
+            var ana = NPC.Get<AnaSlughin>();
+            if (ana?.Relationship == null) return "Ana Slughin not spawned";
+            if (ana.Relationship.IsUnlocked) return "already unlocked; " + ProbeStatus();
+            ana.Relationship.Unlock(NPCRelationship.UnlockType.Recommendation, true);
+            return ProbeStatus();
+        }
     }
 }

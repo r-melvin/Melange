@@ -152,6 +152,17 @@ namespace Melange.Psychedelics
             try { Instance?.Dialogue.ShowWorldText(text, 5f); } catch { }
         }
 
+        /// <summary>For the probes: where he is, the spot he sees from, where he's headed (and the clock's spot, when given).</summary>
+        internal static string Describe(Vector3 pond, float pondRadius, int spotCount, int clockSpot)
+        {
+            string clock = clockSpot >= 0 ? $", clock says spot {clockSpot}" : "";
+            if (!TryPosition(out var at)) return "warden not in the world" + clock;
+            var w = Instance;
+            string target = w._target == int.MinValue ? "none yet" : w._target < 0 ? "his post" : "spot " + w._target;
+            string round = TrySpot(pond, pondRadius, spotCount, out int spot) ? "at spot " + spot : "off the round";
+            return $"warden at ({at.x:0.0},{at.y:0.0},{at.z:0.0}) {round}, heading to {target}{clock}";
+        }
+
         private static Vector3 Ring(Vector3 centre, float radius, int spot, int spotCount)
         {
             float a = spot * Mathf.PI * 2f / spotCount;

@@ -1,0 +1,123 @@
+# Melange Sewer: TESTING.md P4 to the end, scripted. Host or single player.
+# One console command per line; "wait N" pauses N seconds; results are "PROBE ..." lines in the Melange_Sewer log, each
+# ending "|| step <Step>; since last probe: <effects and shared events>" (things the 1 s loop does after a command show
+# up in the next probe).
+#
+# Needs a save where the Sewer King is ALIVE and the quest hasn't started (step TalkToJerry: Bagman V or above, or run
+# "sewer trigger"). Slot 1 won't do for the King steps: its King was killed before the mod (fate Defeated), so the quest
+# goes straight to TakeStash there (the last section still works on it).
+#
+# Branches: this run takes spare -> underboss, then kills the King anyway, which also covers the defeat, the stash and
+# the underboss being lost, all without a reload. The payout and the reveal branches can't follow in the same run (one
+# deal ever; a dead King stays dead): uncomment "save" at the fork, and after the run reload that save and run the
+# blocks at the end instead.
+
+sewer status
+
+# --- P4 Jerry's warning ---
+sewer tp jerry
+wait 2
+sewer jerry
+# expect: Jerry's lines; MS_JERRY_ACCEPT chosen; [Jerry] QuestBegins; step GetKey
+wait 2
+sewer status
+# expect: started True, journal quest live
+
+# --- P5 the leads ---
+sewer keys
+# expect: the key holder, Jen, the spare
+sewer frank
+# Jerry's favour without meth (if the player already holds meth, this pays instead)
+sewer favour
+# expect: no key given (bubble "You haven't got any..."), step GetKey
+give meth 3
+sewer favour
+# expect: [Jerry's favour] GiveSpareKey; key items held 1; step EnterSewer
+
+# Jen's sale stays open once the quest has started; her own relationship and cash rules apply
+sewer tp jen
+wait 2
+sewer jen
+setrelationship jen_heard 5
+changecash 5000
+sewer jen buy
+# expect: sold (her ChoiceCallback); key items held 2
+wait 2
+sewer status
+
+# --- P6 the scripted goblin (30 s in the sewer, then he comes; holding meth, he takes it and goes) ---
+sewer tp sewer
+wait 5
+sewer goblin
+# expect: players in sewer 1, scripted visit due True
+wait 40
+sewer goblin
+# expect: goblin Attacking/Retrieving; [goblin came]; step FindClues
+wait 30
+sewer status
+# expect: goblin met True, calmed True; event GoblinCalmed
+
+# --- P7 clues ---
+sewer tp journal
+wait 3
+sewer status
+# expect: [journal]; clues Journal
+sewer tp plaque
+wait 3
+sewer status
+# expect: [plaque] KingIdentified; step ConfrontKing
+
+# --- P8 the King is calm ---
+sewer tp office
+wait 5
+sewer status
+# expect: King fighting False, stays calm True (and his "Who sent you?" bubble in game)
+sewer meet
+# expect: his greeting lines; [met the King] (Ramble clue)
+
+# --- fork: uncomment to keep a save for the other branches ---
+# save
+# wait 5
+
+# --- P9 spare -> underboss ---
+sewer spare
+# expect: [spared] KingSpared, RouteRevealed; event SewerKingSpared; event BootleggersRouteRevealed(fromJournal False); step HearOffer
+sewer deal underboss
+# expect: [underboss] UnderbossHired (QuestComplete if the goblin was met); event SewerKingDealChosen(underboss True); manager registered
+wait 2
+sewer chat king
+sewer status
+# expect: fate Spared, deal Underboss, completed True
+
+# --- P10 (via betrayal) the King dies, the stash ---
+sewer defeat
+wait 3
+sewer status
+# expect: [king down] UnderbossLost, KingDefeated; event SewerKingDefeated; manager none; stash available at his position
+sewer tp stash
+wait 3
+sewer status
+# expect: [stash] PayStash (paid 25000 cash), no second RouteRevealed; stash taken True
+
+# ======== after a reload of the fork save: the payout branch ========
+# sewer spare
+# sewer deal payout
+# expect: [payout] PayHushMoney, paid 10000 cash; event SewerKingDealChosen(underboss False)
+# sewer status
+# sewer defeat
+# wait 3
+# sewer status
+# expect: KingDefeated, but no stash (a payout rules it out)
+
+# ======== after a reload of the fork save: the reveal branch ========
+# sewer reveal
+# expect: [revealed] KingRevealed, KingHostile; event SewerKingRevealed(attacked False); "the Sewer King turns on the player"
+# wait 3
+# sewer status
+# expect: step FightKing, King fighting True
+# sewer defeat
+# wait 3
+# sewer tp stash
+# wait 3
+# sewer status
+# expect: PayStash, RouteRevealed; event BootleggersRouteRevealed(fromJournal True); QuestComplete

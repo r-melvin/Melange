@@ -126,5 +126,63 @@ namespace Melange.Psychedelics
         }
 
         public static int Day => S1API.GameTime.TimeManager.ElapsedDays;
+
+        // ------------------------------------------------------------------ probes (Probe.cs)
+
+        /// <summary>The placed one nearest the local player (the first when there's no player), or null.</summary>
+        public static BuildableItem Nearest(string itemId)
+        {
+            var me = Il2CppScheduleOne.PlayerScripts.Player.Local;
+            BuildableItem best = null; float bestD = float.MaxValue;
+            foreach (var b in All(itemId))
+            {
+                float d = me == null ? 0f : (b.transform.position - me.transform.position).sqrMagnitude;
+                if (d < bestD) { best = b; bestD = d; }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Places one of a grid buildable on the first free tiles of an owned property other than the RV, through the game's
+        /// BuildManager (as the build tool would, without taking it from the pockets).
+        /// </summary>
+        public static string PlaceOnGrid(string itemId)
+        {
+            var any = Il2CppScheduleOne.Registry.GetItem(itemId);
+            if (any == null) return $"{itemId} is not registered";
+            var def = any.TryCast<BuildableItemDefinition>();
+            if (def == null) return $"{itemId} is not a buildable ({any.GetIl2CppType().FullName})";
+            var grid0 = def.BuiltItem?.TryCast<GridItem>();
+            if (grid0 == null) return $"{itemId} is not a grid item (built item {(def.BuiltItem == null ? "null" : def.BuiltItem.GetIl2CppType().FullName)})";
+            int fx = grid0.FootprintX, fy = grid0.FootprintY;
+            Il2CppScheduleOne.Tiles.Grid grid = null; int ox = 0, oy = 0; string where = "";
+            var owned = PropertyType.OwnedProperties;
+            for (int p = 0; owned != null && p < owned.Count && grid == null; p++)
+            {
+                var prop = owned[p];
+                if (prop?.Grids == null || prop.PropertyCode == "rv") continue;
+                for (int g = 0; g < prop.Grids.Count && grid == null; g++)
+                {
+                    var gr = prop.Grids[g];
+                    for (int t = 0; gr?.Tiles != null && t < gr.Tiles.Count && grid == null; t++)
+                    {
+                        var tile = gr.Tiles[t];
+                        bool free = true;
+                        for (int dx = 0; dx < fx && free; dx++)
+                            for (int dy = 0; dy < fy && free; dy++)
+                            {
+                                var other = gr.GetTile(new Il2CppScheduleOne.Tiles.Coordinate(tile.x + dx, tile.y + dy));
+                                free = other != null && (other.OccupantTiles == null || other.OccupantTiles.Count == 0);
+                            }
+                        if (free) { grid = gr; ox = tile.x; oy = tile.y; where = prop.PropertyCode; }
+                    }
+                }
+            }
+            if (grid == null) return $"no free {fx}x{fy} spot for {itemId} in any owned property but the RV";
+            var placed = Il2CppScheduleOne.Building.BuildManager.Instance.CreateGridItem(def.GetDefaultInstance(1), grid, new Vector2(ox, oy), 0, "");
+            if (placed == null) return $"CreateGridItem returned null at {where} ({ox},{oy})";
+            var at = placed.transform.position;
+            return $"placed {itemId} ({fx}x{fy}) at {where} tile ({ox},{oy}), world ({at.x:0.0},{at.y:0.0},{at.z:0.0}), guid {placed.GUID}";
+        }
     }
 }

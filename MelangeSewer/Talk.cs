@@ -89,6 +89,32 @@ namespace Melange.Sewer
             catch (Exception e) { Mod.Log.Warning("speech bubble: " + e.Message); }
         }
 
+        /// <summary>
+        /// For the probes: picks one of our choices as the dialogue menu would (its onChoosen builds the conversation) without
+        /// opening the dialogue UI. Returns null if no such choice; <paramref name="shown"/> is whether the menu shows it now.
+        /// </summary>
+        public Conversation Pick(string text, out bool shown)
+        {
+            shown = false;
+            foreach (var (choice, isShown) in _choices)
+            {
+                if (choice.ChoiceText != text) continue;
+                shown = Safe(isShown);
+                if (!shown) return null;
+                choice.onChoosen.Invoke();
+                return choice.Conversation;
+            }
+            return null;
+        }
+
+        /// <summary>For the probes: a choice inside one of our conversations, handled as if picked in the dialogue.</summary>
+        public bool Choose(string label)
+        {
+            if (label == null || !_onLabel.ContainsKey(label)) return false;
+            OnChoice(label);
+            return true;
+        }
+
         private void OnChoice(string label)
         {
             if (label == null || !_onLabel.TryGetValue(label, out var action)) return;

@@ -184,5 +184,65 @@ namespace Melange.Psychedelics
             }
             catch (Exception e) { Mod.Log.Warning("milking: " + e.Message); }
         }
+
+        // ------------------------------------------------------------------ probes (Probe.cs, host only)
+
+        private static string Describe(BuildableItem b)
+        {
+            string guid = Placed.Guid(b);
+            var s = Placed.Storage(b);
+            var t = Data.TerrariumFor(guid);
+            var toads = new List<string>();
+            foreach (var toad in t.Toads) toads.Add($"{toad.Origin}:{toad.Milkings}");
+            return $"{guid.Substring(0, Math.Min(8, guid.Length))} toads {t.Count} [origin:milkings {string.Join(",", toads)}], ready {Husbandry.Ready(t, Placed.Day)}, " +
+                   $"crickets {(s == null ? 0 : Placed.Count(s, Ids.Crickets))}, venom {(s == null ? 0 : Placed.Count(s, Ids.ToadProduct))}, " +
+                   $"waiting toads {(s == null ? 0 : Placed.Count(s, Ids.LiveToad))}, breed {t.BreedProgress}, fed day {t.LastFedDay}";
+        }
+
+        internal static string ProbeStatus()
+        {
+            var all = new List<string>();
+            foreach (var b in Placed.All(Ids.Terrarium)) all.Add(Describe(b));
+            return $"{all.Count} terrarium(s)" + (all.Count > 0 ? ": " + string.Join("; ", all) : "");
+        }
+
+        private static BuildableItem Probed(out string why)
+        {
+            var b = Placed.Nearest(Ids.Terrarium);
+            why = b == null ? "no terrarium placed (psy terra place)" : Placed.Storage(b) == null ? "the terrarium has no storage" : null;
+            return why == null ? b : null;
+        }
+
+        /// <summary>Toads and crickets from the pockets into the nearest terrarium's tray, then the scan that releases them.</summary>
+        internal static string ProbeAdd()
+        {
+            var b = Probed(out string why);
+            if (b == null) return why;
+            var s = Placed.Storage(b);
+            int toads = Items.MoveToStorage(s, Ids.LiveToad), crickets = Items.MoveToStorage(s, Ids.Crickets);
+            _next = 0f; Tick();
+            return $"put in {toads} toad(s) and {crickets} cricket tub(s); {Describe(b)}";
+        }
+
+        internal static string ProbeMilk()
+        {
+            var b = Probed(out string why);
+            if (b == null) return why;
+            var s = Placed.Storage(b);
+            int before = Placed.Count(s, Ids.ToadProduct) + Items.Count(Ids.ToadProduct);
+            Milk(b, Placed.Guid(b));
+            int after = Placed.Count(s, Ids.ToadProduct) + Items.Count(Ids.ToadProduct);
+            return $"venom (tank + pockets) {before} -> {after}; {Describe(b)}";
+        }
+
+        /// <summary>The midnight step now, for the given day (default today; a terrarium already fed that day is skipped).</summary>
+        internal static string ProbeNight(string dayArg)
+        {
+            int day = dayArg != null && int.TryParse(dayArg, out int d) ? d : Placed.Day;
+            int skipped = 0;
+            foreach (var b in Placed.All(Ids.Terrarium)) if (Data.TerrariumFor(Placed.Guid(b)).LastFedDay == day) skipped++;
+            OnDayPassed(day);
+            return $"day {day}{(skipped > 0 ? $" ({skipped} already fed that day: skipped; pass a later day)" : "")}; {ProbeStatus()}";
+        }
     }
 }
