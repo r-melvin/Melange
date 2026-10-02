@@ -462,24 +462,25 @@ namespace PaperTrail
                 rt.sizeDelta = new Vector2(92, 26);
                 return SmallButton(rt, label, a);
             }
+            // Each mode has only its own actions (loading has its own button in the pause menu). The fields are
+            // static, so the other mode's are cleared: a screen destroyed with its scene would otherwise leave
+            // Select / CoverForLoading reaching for a dead button.
             if (_mode == Mode.Save)
             {
                 _save = Add("Save", NewSave);
                 _overwrite = Add("Overwrite", Overwrite);
+                _load = null;
             }
             else
             {
-                // Only Save mode has these. They are static, so a Save screen used earlier in the session (and
-                // destroyed with its scene) would still be here, and Select / CoverForLoading would reach for a
-                // dead button: the Load screen at the main menu then threw and the load never started.
                 _save = null;
                 _overwrite = null;
+                _load = Add("Load", Load);
             }
-            _load = Add("Load", Load);
             _rename = Add("Rename", Rename);
             _pin = Add("Pin", TogglePin);
             _delete = Add("Delete", Delete);
-            Add("Close", CloseIfOpen);
+            // No Close button: Escape closes it, as it does the game's own menus (OnExit).
 
             _status = HintText(root);
         }
@@ -633,7 +634,7 @@ namespace PaperTrail
         {
             if (!_open || _root == null) return;
             _campaign.text = CampaignName(_slot);
-            bool browse = _mode == Mode.Load && Mod.Instance.CurrentSlot <= 0 && Campaigns().Count() > 1;
+            bool browse = _mode == Mode.Load && Campaigns().Count() > 1;      // any campaign, also from inside a game
             _prevCampaign.Button.gameObject.SetActive(browse);
             _nextCampaign.Button.gameObject.SetActive(browse);
 
@@ -801,7 +802,7 @@ namespace PaperTrail
             bool isSnap = snap != null;
             bool canLoadSlot = !isSnap && _mode == Mode.Load && SaveInfoOf(_slot) != null && Entries.Count == 0;
 
-            _load.SetEnabled(!_saving && (isSnap || canLoadSlot));
+            _load?.SetEnabled(!_saving && (isSnap || canLoadSlot));
             _rename.SetEnabled(!_saving && isSnap);
             _pin.SetEnabled(!_saving && isSnap);
             _delete.SetEnabled(!_saving && isSnap);

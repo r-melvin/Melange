@@ -6,7 +6,7 @@ share is compiled into each of them, never shipped as a separate library.
 
 | Mod | What it does | Status |
 |---|---|---|
-| [Paper Trail](PaperTrail/) | Rolling auto-saves every 2 in-game hours at a safe moment, a snapshot of every save, and a save/load screen from the main menu and pause menu. | 0.1.0 |
+| [Paper Trail](PaperTrail/) | Rolling auto-saves every 2 in-game hours at a safe moment, a snapshot of every save, and a save/load screen from the main menu and pause menu. | 0.2.0 |
 
 Looking for the fixes for other people's mods? Those are
 [Schedule I Unofficial Mod Fixes (S1UMF)](https://github.com/r-melvin/S1UMF).
@@ -19,8 +19,10 @@ A rolling auto-save and a save manager that looks and feels like part of the gam
   the game is saving.
 - **Key-moment saves** when a quest is completed, a dealer is recruited, a property or business is bought, you
   rank up, the cartel situation changes, or a new area or supplier is unlocked. (Customer unlocked is off by default.)
-- **Save screen** from main-menu *Continue*, the pause menu's *Save* button and the safehouse *Intercom Save
-  Point*. Load, Save, Overwrite, Rename, Pin and Delete, built from the game's own panels and buttons.
+- **Save and load screens** from main-menu *Continue*, the pause menu's *Save* and *Load* buttons and the safehouse
+  *Intercom Save Point*. Saving offers Save, Overwrite, Rename, Pin and Delete; loading offers Load, Rename, Pin and
+  Delete, for any campaign (`<` and `>` switch between them, in a game too). Escape closes them, as it does the game's
+  own menus. Built from the game's own panels and buttons.
   Holding **Shift** while the game starts skips "continue last game on start-up".
 - **Follows the game's 60-second save wait** after a save-point save or a load.
 - **Safeguards:** a copy is kept before a save is loaded into a newer game version or with a changed mod list.

@@ -16,6 +16,7 @@ namespace PaperTrail
     internal static class Hooks
     {
         private const string SaveButtonName = "PaperTrail.Save";
+        private const string LoadButtonName = "PaperTrail.Load";
 
         public static IEnumerator AttachWhenReady(string scene)
         {
@@ -82,40 +83,49 @@ namespace PaperTrail
                       + (visible != null ? "visible one: " + PathOf(visible.transform) : "none of them is visible yet") + ")");
         }
 
-        /// <summary>A Save button below Resume in the pause menu, copied from it so it looks the same.</summary>
+        /// <summary>Save and Load buttons below Resume in the pause menu, copied from it so they look the same.</summary>
         private static void AttachPauseMenu()
         {
             if (!Singleton<PauseMenu>.InstanceExists) return;
             var menu = Singleton<PauseMenu>.Instance.transform;
             if (menu.GetComponentsInChildren<Transform>(true).Any(t => t.name == SaveButtonName)) return;
             var resume = FindButton("Resume", menu);
-            if (resume == null) { Mod.Log.Warning("pause menu: no Resume button found - no Save button added"); return; }
+            if (resume == null) { Mod.Log.Warning("pause menu: no Resume button found - no Save or Load button added"); return; }
             Ui.FindFont(resume);
 
+            var save = AddPauseButton(resume, resume.gameObject, SaveButtonName, "Save", SaveScreen.Mode.Save);
+            AddPauseButton(resume, save, LoadButtonName, "Load", SaveScreen.Mode.Load);
+            Mod.Log.Msg("pause menu: Save and Load added below Resume");
+        }
+
+        /// <summary>A copy of Resume placed just below <paramref name="above"/>, opening the save screen in <paramref name="mode"/>.</summary>
+        private static GameObject AddPauseButton(Button resume, GameObject above, string name, string label, SaveScreen.Mode mode)
+        {
             var parent = resume.transform.parent;
             var copy = Object.Instantiate(resume.gameObject, parent);
-            copy.name = SaveButtonName;
-            copy.transform.SetSiblingIndex(resume.transform.GetSiblingIndex() + 1);
+            copy.name = name;
+            copy.transform.SetSiblingIndex(above.transform.GetSiblingIndex() + 1);
             var button = copy.GetComponent<Button>();
             button.onClick = new Button.ButtonClickedEvent();
-            button.onClick.AddListener((UnityAction)new Action(() => SaveScreen.Open(SaveScreen.Mode.Save)));
+            button.onClick.AddListener((UnityAction)new Action(() => SaveScreen.Open(mode)));
             var text = copy.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (text != null) text.text = "Save";
+            if (text != null) text.text = label;
 
-            // Without a layout group the copy sits on top of Resume: move it and everything below down a step.
+            // Without a layout group the copy sits on top of the button it was copied from: move it and
+            // everything below a step down.
             if (parent.GetComponent<LayoutGroup>() == null)
             {
-                var rt = resume.GetComponent<RectTransform>();
-                float step = rt.rect.height + 10f;
-                var below = parent.GetComponentsInChildren<Button>(true)
-                    .Where(b => b.transform.parent == parent && b.gameObject != copy
-                                && b.GetComponent<RectTransform>().anchoredPosition.y < rt.anchoredPosition.y)
-                    .ToList();
-                foreach (var b in below) b.GetComponent<RectTransform>().anchoredPosition -= new Vector2(0, step);
-                copy.GetComponent<RectTransform>().anchoredPosition = rt.anchoredPosition - new Vector2(0, step);
-                Mod.Log.Msg($"pause menu: Save added below Resume (moved {below.Count} button(s) down)");
+                var anchor = above.GetComponent<RectTransform>();
+                float step = resume.GetComponent<RectTransform>().rect.height + 10f;
+                foreach (var b in parent.GetComponentsInChildren<Button>(true))
+                {
+                    var rt = b.GetComponent<RectTransform>();
+                    if (b.transform.parent == parent && b.gameObject != copy && rt.anchoredPosition.y < anchor.anchoredPosition.y)
+                        rt.anchoredPosition -= new Vector2(0, step);
+                }
+                copy.GetComponent<RectTransform>().anchoredPosition = anchor.anchoredPosition - new Vector2(0, step);
             }
-            else Mod.Log.Msg("pause menu: Save added below Resume");
+            return copy;
         }
     }
 }
