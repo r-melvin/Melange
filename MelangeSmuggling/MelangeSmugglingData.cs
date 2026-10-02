@@ -1,5 +1,6 @@
-using S1API.Internal.Abstraction;
 using S1API.Saveables;
+using Melange.Core;
+using S1API.Internal.Abstraction;
 
 namespace Melange.Smuggling
 {
@@ -8,13 +9,13 @@ namespace Melange.Smuggling
     /// own save writes it into the slot; the type name is prefixed so it can't collide with another mod's (S1API names
     /// saves by short type name). Nothing goes into the game's own data: without the mod the boat and Dafydd are simply gone.
     /// </summary>
-    public sealed class MelangeSmugglingData : Saveable
+    public sealed class MelangeSmugglingData : Saveable, IResettableSaveData
     {
         public static MelangeSmugglingData Current { get; private set; }
 
         [SaveableField("state")] public SmugglingState State = new SmugglingState();
 
-        public MelangeSmugglingData() { Current = this; }
+        public MelangeSmugglingData() { Current = this; SaveData.Track(this); }
 
         /// <summary>
         /// Back to a fresh game's values. S1API keeps one instance for the whole session and, loading a save, only sets the

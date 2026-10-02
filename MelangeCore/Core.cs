@@ -1,7 +1,7 @@
 using System;
 using MelonLoader;
 
-[assembly: MelonInfo(typeof(Melange.Core.Core), "Melange Core", "0.2.0", "r-melvin")]
+[assembly: MelonInfo(typeof(Melange.Core.Core), "Melange Core", "0.3.0", "r-melvin")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace Melange.Core
@@ -18,7 +18,7 @@ namespace Melange.Core
     public sealed class Core : MelonMod
     {
         /// <summary>The hub's version. Additions bump the minor version; anything a spoke could break on bumps the major.</summary>
-        public static readonly Version Version = new Version(0, 2, 0);
+        public static readonly Version Version = new Version(0, 3, 0);
 
         internal static MelonLogger.Instance Log;
 

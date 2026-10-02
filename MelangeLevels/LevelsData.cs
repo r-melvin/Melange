@@ -1,6 +1,7 @@
 using System.Collections.Generic;
-using S1API.Internal.Abstraction;
 using S1API.Saveables;
+using Melange.Core;
+using S1API.Internal.Abstraction;
 
 namespace Melange.Levels
 {
@@ -8,7 +9,7 @@ namespace Melange.Levels
     /// What the levels spoke remembers for one saved game. An S1API saveable, so the game's own save system writes it into the
     /// slot. Its type name is prefixed so it can't collide with another mod's save data (S1API names saves by short type name).
     /// </summary>
-    public sealed class MelangeLevelsData : Saveable
+    public sealed class MelangeLevelsData : Saveable, IResettableSaveData
     {
         public static MelangeLevelsData Current { get; private set; }
 
@@ -30,7 +31,7 @@ namespace Melange.Levels
 
         public int LastUsed(OfferKind kind) => OffersLastUsed.TryGetValue(kind.ToString(), out int d) ? d : -1;
 
-        public MelangeLevelsData() { Current = this; }
+        public MelangeLevelsData() { Current = this; SaveData.Track(this); }
 
         /// <summary>
         /// Back to a fresh game's values. S1API keeps one instance for the whole session and, loading a save, only sets the

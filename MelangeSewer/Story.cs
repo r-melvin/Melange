@@ -70,7 +70,7 @@ namespace Melange.Sewer
         private static void OnMenu()
         {
             Quest = null;
-            MelangeSewerData.Current?.Reset();
+            MelangeSewerData.Current?.ResetToDefaults();
             DownTheDrain.Forget();
             _sewer = null; _jerry = _frank = _king = null; Jen.Forget(); _journal = _plaque = _stash = null;
             _goblinHooked = IntPtr.Zero; _inSewerSince = -1f; _kingSpokeThisVisit = false;

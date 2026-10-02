@@ -16,7 +16,7 @@ MelonLoader 0.7.x. On its own it changes nothing.
 
 public override void OnInitializeMelon()
 {
-    if (!Melange.Core.Core.Require(new Version(0, 2, 0), out string problem)) { LoggerInstance.Error(problem); return; }
+    if (!Melange.Core.Core.Require(new Version(0, 3, 0), out string problem)) { LoggerInstance.Error(problem); return; }
     Events.Subscribe<SaveLoaded>(_ => /* the save is fully loaded */ { });
 }
 ```
@@ -29,7 +29,7 @@ Harmony-patch a one-line method: it gets inlined and the patch silently never ru
 | Service | What it gives |
 |---|---|
 | `Events` | Typed publish/subscribe. A throwing handler is logged and the others still run. |
-| Game events | `MainSceneLoaded`, `SaveLoaded`, `MenuLoaded`, `XpAwarding` (change the amount) / `XpAwarded` (on the awarding peer), `TierUp`, `TierReached` (once per tier crossed), `DayPassed`, `WeekPassed` |
+| Game events | `MainSceneLoaded`, `SaveLoaded` / `SaveLeaving` (entered / about to leave a save, each with `IsHost`), `MenuLoaded`, `XpAwarding` (change the amount) / `XpAwarded` (on the awarding peer), `TierUp`, `TierReached` (once per tier crossed), `DayPassed`, `WeekPassed` |
 | Shared events | `UnderbossCandidateUnlocked`, `BulkDiscountStepChanged`, `PrestigeChanged`, `ManagerLoyaltyChanged` |
 | `Host.IsHost` | Only the host (or single player) changes the world; co-op clients follow the game's networking |
 | `RankUpScreen.Register(rank, tier, title, icon)` | An entry on the game's rank-up screen, re-added every load |
@@ -38,8 +38,11 @@ Harmony-patch a one-line method: it gets inlined and the patch silently never ru
 | `OrderTotals.Register(OrderModifier)` | Whole-order multipliers (shop checkout, supplier phone orders, the delivery app) |
 | `Managers` | The manager role (site, daily chores, cut, loyalty): subclass `Manager`, `Managers.Register`; chores run each in-game day on the host |
 
-Saving: each spoke owns one S1API `Saveable` with a prefixed type name (e.g. `MelangeLevelsData`), because S1API names
-saves by short type name.
+Saving: each spoke owns one S1API `Saveable` (inheriting it directly: S1API registers only direct subclasses) with a
+prefixed type name (e.g. `MelangeLevelsData`), because S1API names saves by short type name. It implements
+`IResettableSaveData` and calls `SaveData.Track(this)` in its constructor; the hub calls its `ResetToDefaults()` on
+returning to the menu: S1API keeps one instance per type for the session and only sets the fields a save has
+files for, so without it a save with no data for the spoke would inherit the previous save's.
 
 Versioning: additions bump the minor version; anything a spoke could break on bumps the major. `Core.Require` accepts the
 same major and at least the minor a spoke was built against.

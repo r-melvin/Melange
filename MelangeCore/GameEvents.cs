@@ -9,8 +9,26 @@ namespace Melange.Core
     /// <summary>The main game scene finished loading (a save is being entered).</summary>
     public sealed class MainSceneLoaded { }
 
-    /// <summary>The save has finished loading (the game's LoadManager reports it loaded): scene objects, shops and save data are ready.</summary>
-    public sealed class SaveLoaded { }
+    /// <summary>
+    /// The save has finished loading (the game's LoadManager reports it loaded): scene objects, shops and save data are ready.
+    /// The "entered" half of <see cref="SaveLeaving"/>; <see cref="IsHost"/> says whether this peer changes the world.
+    /// </summary>
+    public sealed class SaveLoaded
+    {
+        public bool IsHost { get; }
+        internal SaveLoaded(bool isHost) => IsHost = isHost;
+    }
+
+    /// <summary>
+    /// The player is leaving the save (quitting to the menu, or loading another): published from the game's
+    /// <c>LoadManager.onPreSceneChange</c>, before the main scene unloads, while its objects still exist. Undo world changes
+    /// here; saved data has already been written by then if the player saved.
+    /// </summary>
+    public sealed class SaveLeaving
+    {
+        public bool IsHost { get; }
+        internal SaveLeaving(bool isHost) => IsHost = isHost;
+    }
 
     /// <summary>An in-game day passed (midnight), on every peer. <see cref="Day"/> is the game's elapsed day count.</summary>
     public sealed class DayPassed
@@ -112,10 +130,39 @@ namespace Melange.Core
                 SubscribeDays();
                 RankUpScreen.Apply();
                 Prices.OnSceneLoaded();
+                SubscribeLeaving();
                 Events.Publish(new MainSceneLoaded());
                 MelonLoader.MelonCoroutines.Start(WhenLoaded());
             }
-            else if (scene == "Menu") { _subscribedTo = null; _timeSubscribedTo = null; EmployeeSlots.Reset(); Managers.Reset(); Events.Publish(new MenuLoaded()); }
+            else if (scene == "Menu")
+            {
+                _subscribedTo = null; _timeSubscribedTo = null; _inSave = false;
+                EmployeeSlots.Reset(); Managers.Reset(); SaveData.ResetAll();
+                Events.Publish(new MenuLoaded());
+            }
+        }
+
+        private static IntPtr _leavingSubscribedTo;
+        private static bool _inSave;
+
+        /// <summary>One listener on the LoadManager's pre-scene-change event (it survives scene loads), publishing SaveLeaving once per save.</summary>
+        private static void SubscribeLeaving()
+        {
+            _inSave = true;
+            try
+            {
+                var lm = Singleton<Il2CppScheduleOne.Persistence.LoadManager>.Instance;
+                if (lm == null || lm.Pointer == _leavingSubscribedTo || lm.onPreSceneChange == null) return;
+                lm.onPreSceneChange.AddListener(new Action(() =>
+                {
+                    if (!_inSave) return;
+                    _inSave = false;
+                    Core.Log.Msg("leaving the save");
+                    Events.Publish(new SaveLeaving(Host.IsHost));
+                }));
+                _leavingSubscribedTo = lm.Pointer;
+            }
+            catch (Exception e) { Core.Log.Warning("SaveLeaving events are off: " + e.Message); }
         }
 
         private static System.Collections.IEnumerator WhenLoaded()
@@ -126,7 +173,7 @@ namespace Melange.Core
             RankUpScreen.Apply();
             Prices.Refresh();
             EmployeeSlots.ApplyAll();
-            Events.Publish(new SaveLoaded());
+            Events.Publish(new SaveLoaded(Host.IsHost));
         }
 
         private static bool IsGameLoaded()

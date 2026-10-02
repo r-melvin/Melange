@@ -1,6 +1,7 @@
 using System.Collections.Generic;
-using S1API.Internal.Abstraction;
 using S1API.Saveables;
+using Melange.Core;
+using S1API.Internal.Abstraction;
 
 namespace Melange.Hydro
 {
@@ -14,7 +15,7 @@ namespace Melange.Hydro
     /// Holes are saved by the game under the Grow Tent's item ID (so without the mod they load as Grow Tents with their
     /// plants). This record is what turns them back into holes: GUID -> the item they really are.
     /// </remarks>
-    public sealed class MelangeHydroData : Saveable
+    public sealed class MelangeHydroData : Saveable, IResettableSaveData
     {
         public static MelangeHydroData Current { get; private set; }
 
@@ -33,7 +34,7 @@ namespace Melange.Hydro
         /// <summary>Holes that have had their grow medium poured in (once per placement; after its uses run out, any soil will do).</summary>
         [SaveableField("filled")] public List<string> Filled = new List<string>();
 
-        public MelangeHydroData() { Current = this; }
+        public MelangeHydroData() { Current = this; SaveData.Track(this); }
 
         /// <summary>
         /// Loads before the game's buildings, so a hole saved under the Grow Tent's ID can be told apart while it is being

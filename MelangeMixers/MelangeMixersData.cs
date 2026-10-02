@@ -1,6 +1,7 @@
 using System.Collections.Generic;
-using S1API.Internal.Abstraction;
 using S1API.Saveables;
+using Melange.Core;
+using S1API.Internal.Abstraction;
 
 namespace Melange.Mixers
 {
@@ -10,7 +11,7 @@ namespace Melange.Mixers
     /// so it can't collide with another mod's save data (S1API names saves by short type name). Nothing here goes into the
     /// game's own data: without the mod the machines are gone anyway (their item ID is unknown), and nothing else changes.
     /// </summary>
-    public sealed class MelangeMixersData : Saveable
+    public sealed class MelangeMixersData : Saveable, IResettableSaveData
     {
         public static MelangeMixersData Current { get; private set; }
 
@@ -19,7 +20,14 @@ namespace Melange.Mixers
         /// <summary>Machine GUID -> its extra slots and running chain.</summary>
         [SaveableField("stations")] public Dictionary<string, StationRecord> Stations = new Dictionary<string, StationRecord>();
 
-        public MelangeMixersData() { Current = this; }
+        /// <summary>Back to a new game's values (the hub calls it on returning to the menu, before the next save loads).</summary>
+        public void ResetToDefaults()
+        {
+            Version = CurrentVersion;
+            Stations = new Dictionary<string, StationRecord>();
+        }
+
+        public MelangeMixersData() { Current = this; SaveData.Track(this); }
 
         public StationRecord For(string guid)
         {

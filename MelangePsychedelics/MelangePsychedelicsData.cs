@@ -1,6 +1,7 @@
 using System.Collections.Generic;
-using S1API.Internal.Abstraction;
 using S1API.Saveables;
+using Melange.Core;
+using S1API.Internal.Abstraction;
 
 namespace Melange.Psychedelics
 {
@@ -13,7 +14,7 @@ namespace Melange.Psychedelics
     /// The game saves the placed terrariums and frames (they are clones of a storage rack) and what's in their slots; this
     /// holds what the game can't: the toads themselves, the designs and their reputations, and the batches.
     /// </remarks>
-    public sealed class MelangePsychedelicsData : Saveable
+    public sealed class MelangePsychedelicsData : Saveable, IResettableSaveData
     {
         public static MelangePsychedelicsData Current { get; private set; }
 
@@ -36,7 +37,7 @@ namespace Melange.Psychedelics
         [SaveableField("sewerDay")] public int SewerDay = -1;
         [SaveableField("sewerCaught")] public int SewerCaught;
 
-        public MelangePsychedelicsData() { Current = this; }
+        public MelangePsychedelicsData() { Current = this; SaveData.Track(this); }
 
         /// <summary>
         /// Back to a fresh game's values. S1API keeps one instance for the whole session and, loading a save, only sets the
