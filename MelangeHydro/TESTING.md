@@ -277,3 +277,7 @@ Each has a probe above; none has been seen in the game.
 - Harvesting can't be scripted: `PlantHarvestable.Harvest` called from a probe throws a NullReferenceException inside
   the game for a vanilla Grow Tent too (the harvestable finds no Plant in its parents when called this way), so it is not
   the mod. Harvest by hand.
+- **Botanist training and bulk assign passed in game** (2026-10-02; the test save raised with `addxp` past Baron III): a
+  hired botanist ($1,400 hire price) is offered "Train in hydroponics ($2,800)" (2x), pot limit 8 -> 16, then "Train in
+  aeroponics ($7,000)" (5x), limit 24; the clipboard limit follows. `assign all` (the Reload key's fill-all) gave him
+  all 3 holes at the motel (2 hydro, 1 aero).

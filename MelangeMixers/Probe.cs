@@ -337,7 +337,15 @@ namespace Melange.Mixers
             if (prop == null) return "the machine has no property";
             if (action == "hire") return Hire(prop, EEmployeeType.Chemist);
             Chemist chemist = null;
-            for (int i = 0; prop.Employees != null && i < prop.Employees.Count && chemist == null; i++) chemist = prop.Employees[i]?.TryCast<Chemist>();
+            for (int i = 0; prop.Employees != null && i < prop.Employees.Count; i++)   // prefer one with room on his station list
+            {
+                var c = prop.Employees[i]?.TryCast<Chemist>();
+                if (c == null) continue;
+                var f = c.configuration?.Stations;
+                bool room = f != null && f.SelectedObjects != null && f.SelectedObjects.Count < f.MaxItems;
+                if (chemist == null || room) chemist = c;
+                if (room) break;
+            }
             if (chemist == null) return $"no chemist at {prop.PropertyCode} ({prop.Employees?.Count ?? 0}/{prop.EmployeeCapacity} employees); 'mixers employee hire' hires one through Manny";
             var cfg = chemist.configuration;
             var field = cfg?.Stations;
@@ -353,8 +361,14 @@ namespace Melange.Mixers
             {
                 var list = new Il2CppList.List<BuildableItem>();
                 for (int i = 0; i < field.SelectedObjects.Count; i++) list.Add(field.SelectedObjects[i]);
-                if (list.Count >= field.MaxItems) assignNote = $"; not assigned: list full ({list.Count}/{field.MaxItems})";
-                else { list.Add(st); field.SetList(list, true); assignNote = "; assigned with ObjectListField.SetList (as the clipboard's submit)"; }
+                string swapped = "";
+                if (list.Count >= field.MaxItems && list.Count > 0)   // a full list: swap out the last station, as a player would on the clipboard
+                {
+                    swapped = $" (list full {list.Count}/{field.MaxItems}: replaced {list[list.Count - 1]?.gameObject.name})";
+                    list.RemoveAt(list.Count - 1);
+                }
+                list.Add(st); field.SetList(list, true);
+                assignNote = "; assigned with ObjectListField.SetList (as the clipboard's submit)" + swapped;
             }
             bool assigned = cfg.MixStations.Contains(st);
             string ready = "not assigned";

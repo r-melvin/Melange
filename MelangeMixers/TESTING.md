@@ -178,4 +178,11 @@ game's `EffectMixCalculator.MixProperties` / `GetKnownProduct`, and its recorded
   mix, asked for a name for the new result, and gave 10x "Probe Kush" [Calming, Energizing, Sneaky, Thought-Provoking]:
   the same product as three Mk2 passes one after another (MATCH, quantity as started). A second run with 5 gave 5.
   A chemist's clipboard accepts the mixer as a station (`ChemistConfiguration.IsStationValid` True); the test save's
-  chemist had his list full (4/4), so an employee running it is not run yet.
+  chemist had his list full (4/4); see below.
+- **The Four-Ingredient Mixer and a chemist passed in game** (2026-10-02): 10 OG Kush + Cuke + Banana + Paracetamol +
+  Donut took 50 min (5 min/item, x1.5 of the Mk2's 3, rounded) and gave "Probe Four" [Calming, Energizing, Sneaky,
+  Calorie-Dense, Thought-Provoking], the same as four Mk2 passes (MATCH). The save's chemist (Andrew Williams), given the
+  mixer in place of one of his four stations through the clipboard's `ObjectListField.SetList`, walked over and ran the
+  whole chain on his own within about 50 game minutes, the later ingredients locked while it ran; the new result then
+  waits for a player to name it (as a vanilla new mix does). A freshly hired chemist does nothing until he has a locker
+  and is paid (the game's own "I haven't been assigned a locker").

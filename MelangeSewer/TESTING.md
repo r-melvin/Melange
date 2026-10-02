@@ -172,6 +172,9 @@ Each: setup, then what to look for. "Host" means single player or the co-op host
   (53, -9, 72) and taken by walking to it).
 - Not covered by the run: the goblin calmed by meth. The game only pacifies him when the targeted player is holding the
   pacify item (`SewerGoblin.IsPlayerHoldingPacifyItem`, meth) in hand; the script gave meth but did not equip it, so he
-  attacked. Hold meth when he comes. Also the payout and reveal branches (one deal per save: reload a save made at the
+  attacked. Hold meth when he comes. Retried with meth equipped (the game reports it as the equipped item) and the goblin
+  2.1 m away: he still attacks, because his vision cone does not see a player teleported into the sewer by script (the
+  player stands 1.7 m above him; `IsPlayerVisible` false), and a retrieve started by hand is cancelled for the same
+  reason. Walk in for real to check the calm. Also the payout and reveal branches (one deal per save: reload a save made at the
   fork) and the King attacked branch (needs a hit by hand). The King's health read 0/100 throughout, an artifact of
   editing the flag on a save where he had been killed.
