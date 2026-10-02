@@ -7,7 +7,6 @@
     <!-- S1API is compiled against a pinned copy: -p:S1ApiDll=..., then ../lib (gitignored), then the game's Mods. -->
     <S1ApiDll Condition="'$(S1ApiDll)' == '' And Exists('$(MSBuildThisFileDirectory)../lib/S1API.Il2Cpp.MelonLoader.dll')">$(MSBuildThisFileDirectory)../lib/S1API.Il2Cpp.MelonLoader.dll</S1ApiDll>
     <S1ApiDll Condition="'$(S1ApiDll)' == ''">$(GameDir)/Mods/S1API.Il2Cpp.MelonLoader.dll</S1ApiDll>
-    <ArtOut>$(MSBuildThisFileDirectory)../scripts/art/out</ArtOut>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="S1API.Il2Cpp.MelonLoader"><HintPath>$(S1ApiDll)</HintPath><Private>false</Private></Reference>
@@ -19,10 +18,11 @@
     <ProjectReference Include="../MelangeCore/MelangeCore.csproj" Private="false" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The machines' models, built by scripts/art/build_mixers.py (Blender), embedded when they exist. Without them the
-         machines wear the Mk2's own look, tinted per tier (Looks.cs). -->
-    <EmbeddedResource Include="$(ArtOut)/mixer2.mesh.json" LogicalName="MelangeMixers.mixer2.mesh.json" Condition="Exists('$(ArtOut)/mixer2.mesh.json')" />
-    <EmbeddedResource Include="$(ArtOut)/mixer3.mesh.json" LogicalName="MelangeMixers.mixer3.mesh.json" Condition="Exists('$(ArtOut)/mixer3.mesh.json')" />
-    <EmbeddedResource Include="$(ArtOut)/mixer4.mesh.json" LogicalName="MelangeMixers.mixer4.mesh.json" Condition="Exists('$(ArtOut)/mixer4.mesh.json')" />
+    <!-- The machines' models, built by scripts/art/build_mixers.py (Blender) and copied into Art/ (committed, so every
+         build has them; scripts/art/out is generated and ignored). Looks.cs falls back to the Mk2 tinted per tier. -->
+    <EmbeddedResource Include="Art/mixer2.mesh.json" LogicalName="MelangeMixers.mixer2.mesh.json" />
+    <EmbeddedResource Include="Art/mixer3.mesh.json" LogicalName="MelangeMixers.mixer3.mesh.json" />
+    <EmbeddedResource Include="Art/mixer4.mesh.json" LogicalName="MelangeMixers.mixer4.mesh.json" />
+    <None Remove="Art/**" />
   </ItemGroup>
 </Project>
