@@ -1,5 +1,7 @@
 using System;
 using HarmonyLib;
+using Il2CppInterop.Runtime;
+using Il2CppScheduleOne.DevUtilities;
 using Il2CppScheduleOne.Levelling;
 
 namespace Melange.Core
@@ -11,8 +13,10 @@ namespace Melange.Core
     public sealed class MenuLoaded { }
 
     /// <summary>
-    /// XP is about to be added, on the host only. Handlers may change <see cref="Amount"/> (multipliers, caps); a
-    /// change to 0 or less means nothing is added. Left unchanged, the game's award goes through exactly as it was.
+    /// XP is about to be awarded, on the peer that awards it (the host for most awards; a co-op client for its own
+    /// actions), just before it is sent to the server. Handlers may change <see cref="Amount"/> (multipliers, caps); a
+    /// change to 0 or less means nothing is awarded. Left unchanged, the game's award goes through exactly as it was.
+    /// A handler must compute from state every peer shares, so a client's award is changed the same way the host's is.
     /// </summary>
     public sealed class XpAwarding
     {
@@ -21,7 +25,7 @@ namespace Melange.Core
         internal XpAwarding(int amount) { Original = amount; Amount = amount; }
     }
 
-    /// <summary>XP was added, on the host, with the amount after any <see cref="XpAwarding"/> changes.</summary>
+    /// <summary>XP was awarded (sent to the server), on the awarding peer, with the amount after any <see cref="XpAwarding"/> changes.</summary>
     public sealed class XpAwarded
     {
         public int Amount { get; }
@@ -47,13 +51,20 @@ namespace Melange.Core
         internal TierUp(RankTier before, RankTier after) { Before = before; After = after; }
     }
 
-    /// <summary>The hub's game patches, each the only patch Melange puts on its method. They turn game moments into <see cref="Events"/>.</summary>
+    /// <summary>The hub's game hooks, each the only Melange hook on its method or event. They turn game moments into <see cref="Events"/>.</summary>
+    /// <remarks>
+    /// On IL2CPP the game's one-line methods can be inlined, and a Harmony patch on them then never runs: checked in game,
+    /// patches on <c>RpcLogic___AddXP</c> and <c>RpcLogic___IncreaseTierNetworked</c> applied but never fired. So XP is
+    /// hooked on the multi-line method that sends the award to the server, and rank-ups through the game's own
+    /// <c>onRankUp</c> event, which needs no patch.
+    /// </remarks>
     internal static class GameEvents
     {
+        private static LevelManager _subscribedTo;
+
         public static void Patch(HarmonyLib.Harmony harmony)
         {
-            TryPatch(harmony, "XP", typeof(LevelManager), nameof(LevelManager.RpcLogic___AddXP_3316948804), nameof(BeforeAddXp), nameof(AfterAddXp));
-            TryPatch(harmony, "rank up", typeof(LevelManager), nameof(LevelManager.RpcLogic___IncreaseTierNetworked_3953286437), null, nameof(AfterTierUp));
+            TryPatch(harmony, "XP", typeof(LevelManager), nameof(LevelManager.RpcWriter___Server_AddXP_3316948804), nameof(BeforeAddXp), nameof(AfterAddXp));
         }
 
         /// <summary>A patch that fails to apply turns off its events only, never the hub.</summary>
@@ -71,13 +82,27 @@ namespace Melange.Core
 
         public static void SceneInitialized(string scene)
         {
-            if (scene == "Main") Events.Publish(new MainSceneLoaded());
-            else if (scene == "Menu") Events.Publish(new MenuLoaded());
+            if (scene == "Main") { SubscribeRankUp(); Events.Publish(new MainSceneLoaded()); }
+            else if (scene == "Menu") { _subscribedTo = null; Events.Publish(new MenuLoaded()); }
         }
 
-        // The server-side logic of LevelManager.AddXP, which every award reaches (a ServerRpc any peer may call). It runs
-        // only on the host, so a change to the amount happens once. It is a one-liner, and IL2CPP has been seen to inline
-        // tiny methods so a patch never runs (ShopListing.Price, cartel spoke): verify in game before relying on it.
+        /// <summary>The level manager is a scene object: subscribe to each new one's onRankUp, once.</summary>
+        private static void SubscribeRankUp()
+        {
+            try
+            {
+                var lm = NetworkSingleton<LevelManager>.Instance;
+                if (lm == null || lm == _subscribedTo) return;
+                Il2CppSystem.Action<FullRank, FullRank> handler = new Action<FullRank, FullRank>(OnRankUp);
+                lm.onRankUp = lm.onRankUp == null
+                    ? handler
+                    : Il2CppSystem.Delegate.Combine(lm.onRankUp, handler).Cast<Il2CppSystem.Action<FullRank, FullRank>>();
+                _subscribedTo = lm;
+            }
+            catch (Exception e) { Core.Log.Warning($"rank up events are off: {e.Message}"); }
+        }
+
+        // Sends an XP award to the server; every award goes through it, on the awarding peer.
         private static bool BeforeAddXp(ref int xp, ref int __state)
         {
             var awarding = new XpAwarding(xp);
@@ -95,7 +120,7 @@ namespace Melange.Core
             if (__state != 0) Events.Publish(new XpAwarded(__state));
         }
 
-        private static void AfterTierUp(FullRank before, FullRank after)
+        private static void OnRankUp(FullRank before, FullRank after)
             => Events.Publish(new TierUp(new RankTier(before.Rank, before.Tier), new RankTier(after.Rank, after.Tier)));
     }
 }
