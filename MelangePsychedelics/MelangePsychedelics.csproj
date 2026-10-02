@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Melange Psychedelics: toad farming (Toad) and ergot to blotter (LSD) (a Melange spoke; needs Melange Core).
+       Shared settings: ../Directory.Build.props -->
+  <PropertyGroup>
+    <AssemblyName>MelangePsychedelics</AssemblyName>
+    <RootNamespace>Melange.Psychedelics</RootNamespace>
+    <!-- S1API is compiled against a pinned copy: -p:S1ApiDll=..., then ../lib (gitignored), then the game's Mods. -->
+    <S1ApiDll Condition="'$(S1ApiDll)' == '' And Exists('$(MSBuildThisFileDirectory)../lib/S1API.Il2Cpp.MelonLoader.dll')">$(MSBuildThisFileDirectory)../lib/S1API.Il2Cpp.MelonLoader.dll</S1ApiDll>
+    <S1ApiDll Condition="'$(S1ApiDll)' == ''">$(GameDir)/Mods/S1API.Il2Cpp.MelonLoader.dll</S1ApiDll>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="S1API.Il2Cpp.MelonLoader"><HintPath>$(S1ApiDll)</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.PhysicsModule"><HintPath>$(Interop)/UnityEngine.PhysicsModule.dll</HintPath><Private>false</Private></Reference>
+    <ProjectReference Include="../MelangeCore/MelangeCore.csproj" Private="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The models, built by scripts/art/build_terrarium.py, build_toad.py and build_ergot.py (Blender; the blotter frame) and copied here
+         (scripts/art/out is generated and ignored). Without one, the thing it dresses keeps its donor's look. -->
+    <EmbeddedResource Include="Art/terrarium.mesh.json" LogicalName="MelangePsychedelics.terrarium.mesh.json" />
+    <EmbeddedResource Include="Art/toad.mesh.json" LogicalName="MelangePsychedelics.toad.mesh.json" />
+    <EmbeddedResource Include="Art/blotter_frame.mesh.json" LogicalName="MelangePsychedelics.blotter_frame.mesh.json" />
+    <None Remove="Art/**" />
+    <None Remove="TESTING.md" />
+    <None Remove="README.md" />
+  </ItemGroup>
+  <Target Name="RequireS1Api" BeforeTargets="ResolveAssemblyReferences" Condition="!Exists('$(S1ApiDll)')">
+    <Error Text="S1API (IL2CPP build) not found at $(S1ApiDll). Copy S1API.Il2Cpp.MelonLoader.dll into the repo's lib/ folder, or pass -p:S1ApiDll=/path/to/it." />
+  </Target>
+</Project>
