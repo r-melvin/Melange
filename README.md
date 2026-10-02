@@ -9,6 +9,11 @@ share is compiled into each of them, never shipped as a separate library.
 | [Paper Trail](PaperTrail/README.md) | Save/load manager: rolling auto-saves at safe moments, every save kept and loadable from the main menu or pause menu, and backups of each slot. | 0.4.0 |
 | [Melange Core](MelangeCore/) | The hub the Melange spokes build on: shared game events (scenes, save loaded, XP, rank-ups, days), an event bus, rank-up screen entries, employee slots, a shop price pipeline, a manager role, host and version checks. No gameplay of its own; not needed by Paper Trail. | 0.2.0 (unreleased) |
 | [Melange Levels](MelangeLevels/) | Rewards for the late ranks, where the game unlocks nothing: extra employees at a property, bulk discounts, underbosses to hire (with the cartel mod), and Prestige from Kingpin on, in a Connections phone app. Needs Melange Core. | 0.1.0 (in development) |
+| [Melange Mixers](MelangeMixers/) | Mixing stations that take two, three or four ingredients in one pass, unlocked by the late ranks. Employees run them like the Mk2. Needs Melange Core. | 0.1.0 (in development) |
+| [Melange Sewer](MelangeSewer/) | A story for the sewers: Jerry's job, Jen's key, the Sewer King and the Goblin, and what you do with the King when you find him. Needs Melange Core. | 0.1.0 (in development) |
+| [Melange Hydro](MelangeHydro/) | Late-game hydroponic trays and aeroponic towers where each hole is a pot, botanist training, a pump to the tap and Grow N Juicer nutrient. Needs Melange Core. | 0.1.0 (in development) |
+| [Melange Smuggling](MelangeSmuggling/README.md) | Dafydd "Turnip Night" Seabiscuit's speedboat at the Docks: bulk orders that sail at night with or without your product, and imports on the way back. Oscar introduces you. Needs Melange Core. | 0.1.0 (in development) |
+| [Melange Psychedelics](MelangePsychedelics/README.md) | Toad and LSD: toads from the pond (mind the wildlife officer) or Randy's night stall, terrariums, ergot from Fungal Phil, Ana Slughin's LSD and blotter designs as brands. Needs Melange Core. | 0.1.0 (in development) |
 
 Looking for the fixes for other people's mods? Those are
 [Schedule I Unofficial Mod Fixes (S1UMF)](https://github.com/r-melvin/S1UMF).
