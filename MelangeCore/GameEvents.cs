@@ -9,6 +9,19 @@ namespace Melange.Core
     /// <summary>The main game scene finished loading (a save is being entered).</summary>
     public sealed class MainSceneLoaded { }
 
+    /// <summary>The save has finished loading (the game's LoadManager reports it loaded): scene objects, shops and save data are ready.</summary>
+    public sealed class SaveLoaded { }
+
+    /// <summary>An in-game day passed (midnight), on every peer. <see cref="Day"/> is the game's elapsed day count.</summary>
+    public sealed class DayPassed
+    {
+        public int Day { get; }
+        internal DayPassed(int day) => Day = day;
+    }
+
+    /// <summary>An in-game week passed (Monday midnight), on every peer.</summary>
+    public sealed class WeekPassed { }
+
     /// <summary>The main menu finished loading (the game started, or the player quit to the menu).</summary>
     public sealed class MenuLoaded { }
 
@@ -42,6 +55,15 @@ namespace Melange.Core
         public override string ToString() => $"{Rank} {Tier}";
     }
 
+    /// <summary>One tier reached, on every peer. A single rank-up can cover several tiers: each gets its own <see cref="TierReached"/>, in order.</summary>
+    public sealed class TierReached
+    {
+        public RankTier Reached { get; }
+        /// <summary>Tier 1 of a rank: a new rank, not just a tier.</summary>
+        public bool IsNewRank => Reached.Tier == 1;
+        internal TierReached(RankTier reached) => Reached = reached;
+    }
+
     /// <summary>The shared rank went up one or more tiers, on every peer. <see cref="RankChanged"/>: a new rank, not just a tier.</summary>
     public sealed class TierUp
     {
@@ -61,6 +83,7 @@ namespace Melange.Core
     internal static class GameEvents
     {
         private static LevelManager _subscribedTo;
+        private static Il2CppScheduleOne.GameTime.TimeManager _timeSubscribedTo;
 
         public static void Patch(HarmonyLib.Harmony harmony)
         {
@@ -82,8 +105,38 @@ namespace Melange.Core
 
         public static void SceneInitialized(string scene)
         {
-            if (scene == "Main") { SubscribeRankUp(); Events.Publish(new MainSceneLoaded()); }
-            else if (scene == "Menu") { _subscribedTo = null; Events.Publish(new MenuLoaded()); }
+            if (scene == "Main")
+            {
+                SubscribeRankUp();
+                SubscribeDays();
+                RankUpScreen.Apply();
+                Prices.OnSceneLoaded();
+                Events.Publish(new MainSceneLoaded());
+                MelonLoader.MelonCoroutines.Start(WhenLoaded());
+            }
+            else if (scene == "Menu") { _subscribedTo = null; _timeSubscribedTo = null; EmployeeSlots.Reset(); Managers.Reset(); Events.Publish(new MenuLoaded()); }
+        }
+
+        private static System.Collections.IEnumerator WhenLoaded()
+        {
+            float until = UnityEngine.Time.realtimeSinceStartup + 300f;
+            while (UnityEngine.Time.realtimeSinceStartup < until && !IsGameLoaded()) yield return null;
+            if (!IsGameLoaded()) yield break;
+            RankUpScreen.Apply();
+            Prices.Refresh();
+            EmployeeSlots.ApplyAll();
+            Events.Publish(new SaveLoaded());
+        }
+
+        private static bool IsGameLoaded()
+        {
+            try
+            {
+                return Singleton<Il2CppScheduleOne.Persistence.LoadManager>.InstanceExists
+                    && Singleton<Il2CppScheduleOne.Persistence.LoadManager>.Instance.IsGameLoaded
+                    && !Singleton<Il2CppScheduleOne.Persistence.LoadManager>.Instance.IsLoading;
+            }
+            catch { return false; }
         }
 
         /// <summary>The level manager is a scene object: subscribe to each new one's onRankUp, once.</summary>
@@ -100,6 +153,30 @@ namespace Melange.Core
                 _subscribedTo = lm;
             }
             catch (Exception e) { Core.Log.Warning($"rank up events are off: {e.Message}"); }
+        }
+
+        /// <summary>The time manager clears its day and week events when its scene ends: subscribe to each new one, once.</summary>
+        private static void SubscribeDays()
+        {
+            try
+            {
+                var tm = NetworkSingleton<Il2CppScheduleOne.GameTime.TimeManager>.Instance;
+                if (tm == null || tm == _timeSubscribedTo) return;
+                Il2CppSystem.Action day = new Action(OnDayPass);
+                Il2CppSystem.Action week = new Action(() => Events.Publish(new WeekPassed()));
+                tm.onDayPass = tm.onDayPass == null ? day : Il2CppSystem.Delegate.Combine(tm.onDayPass, day).Cast<Il2CppSystem.Action>();
+                tm.onWeekPass = tm.onWeekPass == null ? week : Il2CppSystem.Delegate.Combine(tm.onWeekPass, week).Cast<Il2CppSystem.Action>();
+                _timeSubscribedTo = tm;
+            }
+            catch (Exception e) { Core.Log.Warning($"day and week events are off: {e.Message}"); }
+        }
+
+        private static void OnDayPass()
+        {
+            int day = 0;
+            try { day = NetworkSingleton<Il2CppScheduleOne.GameTime.TimeManager>.Instance.ElapsedDays; } catch { }
+            Events.Publish(new DayPassed(day));
+            Managers.OnDayPassed(day);
         }
 
         // Sends an XP award to the server; every award goes through it, on the awarding peer.
@@ -121,6 +198,10 @@ namespace Melange.Core
         }
 
         private static void OnRankUp(FullRank before, FullRank after)
-            => Events.Publish(new TierUp(new RankTier(before.Rank, before.Tier), new RankTier(after.Rank, after.Tier)));
+        {
+            Events.Publish(new TierUp(new RankTier(before.Rank, before.Tier), new RankTier(after.Rank, after.Tier)));
+            foreach (var (rank, tier) in Ranks.TiersCrossed((int)before.Rank, before.Tier, (int)after.Rank, after.Tier))
+                Events.Publish(new TierReached(new RankTier((ERank)rank, tier)));
+        }
     }
 }

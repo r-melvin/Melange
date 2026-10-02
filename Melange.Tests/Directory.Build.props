@@ -1,0 +1,3 @@
+<Project>
+  <!-- Tests build without the game: this stops ../Directory.Build.props (game and MelonLoader references) from applying. -->
+</Project>

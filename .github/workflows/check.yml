@@ -15,6 +15,7 @@ jobs:
         run: |
           for proj in */*.csproj; do
             mod=$(dirname "$proj")
+            case "$mod" in *.Tests) continue;; esac
             grep -rhoE 'MelonInfo\(typeof\([^)]*\), *"[^"]+", *"[0-9]+\.[0-9]+\.[0-9]+"' "$mod" --include=*.cs | head -1 | grep -q . \
               || { echo "::error::$mod has no MelonInfo with an x.y.z version"; exit 1; }
           done
@@ -30,3 +31,13 @@ jobs:
             [ "$(echo "$name" | tr '[:upper:] ' '[:lower:]-')-v$version" = "$tag" ] && ok=1
           done
           [ $ok = 1 ] || { echo "::error::tag $tag matches no mod's name and version"; exit 1; }
+  test:
+    # The unit tests compile only the mods' pure-logic source files, so they need neither the game nor MelonLoader.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Unit tests
+        run: dotnet test Melange.Tests/Melange.Tests.csproj

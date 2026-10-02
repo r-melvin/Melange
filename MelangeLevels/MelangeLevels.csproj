@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Melange Levels: rewards for the late ranks, where the game unlocks nothing (a Melange spoke; needs Melange Core).
+       Shared settings: ../Directory.Build.props -->
+  <PropertyGroup>
+    <AssemblyName>MelangeLevels</AssemblyName>
+    <RootNamespace>Melange.Levels</RootNamespace>
+    <!-- S1API is compiled against a pinned copy: -p:S1ApiDll=..., then ../lib (gitignored), then the game's Mods. -->
+    <S1ApiDll Condition="'$(S1ApiDll)' == '' And Exists('$(MSBuildThisFileDirectory)../lib/S1API.Il2Cpp.MelonLoader.dll')">$(MSBuildThisFileDirectory)../lib/S1API.Il2Cpp.MelonLoader.dll</S1ApiDll>
+    <S1ApiDll Condition="'$(S1ApiDll)' == ''">$(GameDir)/Mods/S1API.Il2Cpp.MelonLoader.dll</S1ApiDll>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="S1API.Il2Cpp.MelonLoader"><HintPath>$(S1ApiDll)</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(Interop)/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UIModule"><HintPath>$(Interop)/UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(Interop)/UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
+    <ProjectReference Include="../MelangeCore/MelangeCore.csproj" Private="false" />
+  </ItemGroup>
+</Project>

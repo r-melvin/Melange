@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Unit tests for the parts of the Melange mods that are pure logic. They compile those source files directly (no game,
+       no MelonLoader), so they run anywhere, CI included. Game behaviour is checked in game by the probe scenarios. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Every project keeps its pure logic in a Logic/ folder (no game, MelonLoader or S1API types), compiled in here.
+         A new project's Logic/ is picked up automatically; its tests go in their own <Project>Tests.cs file. -->
+    <Compile Include="../*/Logic/**/*.cs" LinkBase="Logic" />
+  </ItemGroup>
+</Project>

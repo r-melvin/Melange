@@ -11,6 +11,9 @@ namespace Melange.Core
     {
         private static readonly Dictionary<Type, List<Delegate>> Handlers = new Dictionary<Type, List<Delegate>>();
 
+        /// <summary>Where a handler's exception is reported (the hub sets this to its log).</summary>
+        internal static Action<string> OnHandlerError = _ => { };
+
         /// <summary>Calls <paramref name="handler"/> for every <typeparamref name="T"/> published. Returns the way to stop.</summary>
         public static IDisposable Subscribe<T>(Action<T> handler)
         {
@@ -26,7 +29,7 @@ namespace Melange.Core
             foreach (var handler in list.ToArray())          // a handler may unsubscribe while being called
             {
                 try { ((Action<T>)handler)(message); }
-                catch (Exception e) { Core.Log?.Error($"a {typeof(T).Name} handler threw: {e}"); }
+                catch (Exception e) { OnHandlerError($"a {typeof(T).Name} handler threw: {e}"); }
             }
         }
 

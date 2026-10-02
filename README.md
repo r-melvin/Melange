@@ -7,7 +7,8 @@ share is compiled into each of them, never shipped as a separate library.
 | Mod | What it does | Status |
 |---|---|---|
 | [Paper Trail](PaperTrail/README.md) | Save/load manager: rolling auto-saves at safe moments, every save kept and loadable from the main menu or pause menu, and backups of each slot. | 0.4.0 |
-| [Melange Core](MelangeCore/) | The hub the upcoming Melange mods build on: shared game events (scenes, XP, rank-ups), an event bus, a host check and a version check. No gameplay of its own; not needed by Paper Trail. | 0.1.0 (unreleased) |
+| [Melange Core](MelangeCore/) | The hub the Melange spokes build on: shared game events (scenes, save loaded, XP, rank-ups, days), an event bus, rank-up screen entries, employee slots, a shop price pipeline, a manager role, host and version checks. No gameplay of its own; not needed by Paper Trail. | 0.2.0 (unreleased) |
+| [Melange Levels](MelangeLevels/) | Rewards for the late ranks, where the game unlocks nothing: extra employees at a property, bulk discounts, underbosses to hire (with the cartel mod), and Prestige from Kingpin on, in a Connections phone app. Needs Melange Core. | 0.1.0 (in development) |
 
 Looking for the fixes for other people's mods? Those are
 [Schedule I Unofficial Mod Fixes (S1UMF)](https://github.com/r-melvin/S1UMF).

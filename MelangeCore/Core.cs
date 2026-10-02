@@ -1,13 +1,13 @@
 using System;
 using MelonLoader;
 
-[assembly: MelonInfo(typeof(Melange.Core.Core), "Melange Core", "0.1.0", "r-melvin")]
+[assembly: MelonInfo(typeof(Melange.Core.Core), "Melange Core", "0.2.0", "r-melvin")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace Melange.Core
 {
     /// <summary>
-    /// The hub. Spokes declare <c>[assembly: MelonAdditionalDependencies("Melange Core")]</c> and call
+    /// The hub. Spokes declare <c>[assembly: MelonAdditionalDependencies("MelangeCore")]</c> (the assembly name: MelonLoader matches dependencies by assembly, not by display name) and call
     /// <see cref="Require"/> first thing, so none runs against a hub older than it was built for.
     /// </summary>
     /// <remarks>
@@ -18,13 +18,14 @@ namespace Melange.Core
     public sealed class Core : MelonMod
     {
         /// <summary>The hub's version. Additions bump the minor version; anything a spoke could break on bumps the major.</summary>
-        public static readonly Version Version = new Version(0, 1, 0);
+        public static readonly Version Version = new Version(0, 2, 0);
 
         internal static MelonLogger.Instance Log;
 
         public override void OnInitializeMelon()
         {
             Log = LoggerInstance;
+            Events.OnHandlerError = message => Log.Error(message);
             GameEvents.Patch(HarmonyInstance);
         }
 
@@ -34,14 +35,6 @@ namespace Melange.Core
         /// Is this hub new enough for the calling spoke? Same major version and at least the minor it was built against.
         /// When it is not, the spoke should log the returned message and stay off.
         /// </summary>
-        public static bool Require(Version builtAgainst, out string problem)
-        {
-            problem = null;
-            if (Version.Major == builtAgainst.Major && Version.Minor >= builtAgainst.Minor) return true;
-            problem = Version.Major != builtAgainst.Major
-                ? $"needs Melange Core {builtAgainst.Major}.x, but {Version} is installed"
-                : $"needs Melange Core {builtAgainst} or newer, but {Version} is installed";
-            return false;
-        }
+        public static bool Require(Version builtAgainst, out string problem) => Versioning.IsCompatible(Version, builtAgainst, out problem);
     }
 }
